@@ -21,10 +21,6 @@
         "backgroundColor": "#0A0A0F"
       },
       "package": "com.flowos.app"
-    },
-    "plugins": [
-      "expo-blur",
-      "expo-haptics"
-    ]
+    }
   }
 }
