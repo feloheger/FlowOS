@@ -3,6 +3,12 @@
     "name": "FlowOS",
     "slug": "flowos",
     "version": "1.0.0",
+    "owner": "feloheger",
+    "extra": {
+      "eas": {
+        "projectId": "c8ebbc76-d951-4ac1-9136-30858a97a3fa"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
