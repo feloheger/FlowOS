@@ -1,31 +1,32 @@
-name: Build iOS App
+name: Build APK
 
 on:
-  push:
-    branches:
-      - main
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
-    name: Build iOS App
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
 
-      - name: Install EAS CLI manually
-        run: npm install -g eas-cli
+      - name: Install EAS CLI manually
+        run: npm install -g eas-cli
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
 
-      - name: Build iOS
-        # Änderung: Plattform auf "ios" geändert
-        run: EAS_NO_VCS=1 eas build --platform ios --profile preview --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build APK
+        run: EAS_NO_VCS=1 eas build --platform android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+was muss ich ändern das es ein apple app wird
