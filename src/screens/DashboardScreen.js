@@ -11,7 +11,14 @@ import { Card, ProgressBar, FadeIn, SectionHeader, EnergyDot } from '../componen
 export default function DashboardScreen({ navigation }) {
   const [energy, setEnergy] = useState(3);
   const [tasks, setTasks] = useState([]);
+  const [now, setNow] = useState(new Date());
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Live clock
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const completedToday = tasks.filter(t => t.done).length;
   const totalToday = tasks.length;
@@ -21,11 +28,17 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const getGreeting = () => {
-    const h = new Date().getHours();
+    const h = now.getHours();
     if (h < 12) return 'Good morning';
     if (h < 18) return 'Good afternoon';
     return 'Good evening';
   };
+
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const secondsStr = String(now.getSeconds()).padStart(2,'0');
+  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
     <View style={styles.container}>
@@ -37,6 +50,7 @@ export default function DashboardScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Header */}
         <FadeIn delay={0}>
           <View style={styles.header}>
             <View>
@@ -49,8 +63,20 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </FadeIn>
 
+        {/* Live Clock */}
+        <FadeIn delay={40}>
+          <Card style={styles.clockCard}>
+            <LinearGradient colors={['#6C63FF14', '#0000']} style={StyleSheet.absoluteFill} />
+            <View style={styles.clockRow}>
+              <Text style={styles.clockTime}>{timeStr}</Text>
+              <Text style={styles.clockSeconds}>{secondsStr}</Text>
+            </View>
+            <Text style={styles.clockDate}>{dateStr}</Text>
+          </Card>
+        </FadeIn>
+
         {/* Energy Check */}
-        <FadeIn delay={80}>
+        <FadeIn delay={120}>
           <Card style={styles.energyCard}>
             <LinearGradient colors={['#6C63FF18', '#6C63FF05']} style={StyleSheet.absoluteFill} />
             <Text style={styles.energyLabel}>Today's Energy</Text>
@@ -72,7 +98,7 @@ export default function DashboardScreen({ navigation }) {
         </FadeIn>
 
         {/* Stats */}
-        <FadeIn delay={160}>
+        <FadeIn delay={200}>
           <View style={styles.statsRow}>
             <StatBox label="Tasks" value={`${completedToday}/${totalToday}`} color={Colors.accent} icon="checkmark-circle" />
             <StatBox label="Projects" value="0" color={Colors.success} icon="folder" />
@@ -81,7 +107,7 @@ export default function DashboardScreen({ navigation }) {
         </FadeIn>
 
         {/* Today's Tasks */}
-        <FadeIn delay={240}>
+        <FadeIn delay={280}>
           <SectionHeader title="Today's Stack" subtitle="Your tasks for today" action="Add" />
           {tasks.length === 0 ? (
             <EmptyState icon="checkmark-circle-outline" text="No tasks yet" sub="Add your first task to get started" />
@@ -140,10 +166,17 @@ function EmptyState({ icon, text, sub }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   scrollContent: { paddingHorizontal: Spacing.base, paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
   greeting: { fontSize: Typography.sm, color: Colors.textSecondary, letterSpacing: 0.3 },
   name: { fontSize: Typography.xxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -0.5 },
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.bgCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+
+  // Clock
+  clockCard: { marginBottom: Spacing.base, padding: Spacing.lg, overflow: 'hidden' },
+  clockRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  clockTime: { fontSize: 52, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -2, fontVariant: ['tabular-nums'] },
+  clockSeconds: { fontSize: Typography.xl, fontWeight: Typography.medium, color: Colors.accent, marginBottom: 8, fontVariant: ['tabular-nums'] },
+  clockDate: { fontSize: Typography.sm, color: Colors.textSecondary, marginTop: 4 },
 
   energyCard: { marginBottom: Spacing.base, padding: Spacing.lg, overflow: 'hidden' },
   energyLabel: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.textSecondary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.md },
