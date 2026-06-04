@@ -29,12 +29,22 @@ export const loadXP = () => loadData(KEYS.XP, 0);
 export const saveXP = (xp) => saveData(KEYS.XP, xp);
 
 export async function addXP(amount) {
-  const sub = await loadSubscription();
-  const multiplier = sub?.active ? 2 : 1;
-  const current = await loadXP();
-  const earned = amount * multiplier;
-  await saveXP(current + earned);
-  return { newTotal: current + earned, earned, multiplier };
+  try {
+    const sub = await loadSubscription();
+    const multiplier = (sub && sub.active === true) ? 2 : 1;
+    const current = await loadXP();
+    const safeAmount = Number(amount) || 0;
+    const earned = safeAmount * multiplier;
+    const newTotal = (Number(current) || 0) + earned;
+    await saveXP(newTotal);
+    return { newTotal, earned, multiplier };
+  } catch (e) {
+    // Fallback: save without multiplier
+    const current = await loadXP();
+    const newTotal = (Number(current) || 0) + (Number(amount) || 0);
+    await saveXP(newTotal);
+    return { newTotal, earned: Number(amount) || 0, multiplier: 1 };
+  }
 }
 
 // Subscription
