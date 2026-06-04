@@ -9,7 +9,7 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, FadeIn, ProgressBar, SectionHeader } from '../components/UI';
 import {
   saveAppLimits, loadAppLimits, saveAppUsage, loadAppUsage,
-  checkAndResetDaily, loadXP,
+  checkAndResetDaily, loadXP, loadSubscription, activateSubscription, cancelSubscription,
 } from '../data/storage';
 import AppBlockedScreen from './AppBlockedScreen';
 
@@ -42,8 +42,21 @@ export default function AppLimitsScreen() {
   const [trackingApp, setTrackingApp] = useState(null);
   const [trackingSeconds, setTrackingSeconds] = useState(0);
   const [blockedApp, setBlockedApp] = useState(null);
+  const [isPro, setIsPro] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
+
   const trackingRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
+  // ─── NEW: timestamp when app went to background ───────────────────────────
+  const backgroundStartRef = useRef(null);
+  const trackingAppRef = useRef(null); // mirror of trackingApp for use in callbacks
+  const appsRef = useRef([]);          // mirror of apps for use in callbacks
+  const usageRef = useRef({});         // mirror of usage for saving from callbacks
+
+  // Keep refs in sync
+  useEffect(() => { trackingAppRef.current = trackingApp; }, [trackingApp]);
+  useEffect(() => { appsRef.current = apps; }, [apps]);
+  useEffect(() => { usageRef.current = usage; }, [usage]);
 
   useEffect(() => {
     (async () => {
@@ -51,9 +64,11 @@ export default function AppLimitsScreen() {
       const savedLimits = await loadAppLimits();
       const savedUsage = await loadAppUsage();
       const savedXP = await loadXP();
+      const sub = await loadSubscription();
       setApps(savedLimits || DEFAULT_APPS);
       setUsage(savedUsage || {});
       setXp(savedXP);
+      setIsPro(sub?.active || false);
       setLoading(false);
     })();
   }, []);
@@ -61,38 +76,83 @@ export default function AppLimitsScreen() {
   useEffect(() => { if (!loading) saveAppLimits(apps); }, [apps]);
   useEffect(() => { if (!loading) saveAppUsage(usage); }, [usage]);
 
-  // Track AppState changes
+  // ─── AppState listener: automatic background time accumulation ─────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
-      if (appStateRef.current === 'active' && nextState !== 'active') stopTracking();
+      const prev = appStateRef.current;
       appStateRef.current = nextState;
+
+      const currentTracking = trackingAppRef.current;
+
+      if (prev === 'active' && nextState !== 'active') {
+        // App going to background
+        if (currentTracking) {
+          backgroundStartRef.current = Date.now();
+          // Stop the foreground interval — time will be settled on return
+          clearInterval(trackingRef.current);
+        }
+      } else if (prev !== 'active' && nextState === 'active') {
+        // App coming back to foreground
+        if (currentTracking && backgroundStartRef.current) {
+          const elapsedMs = Date.now() - backgroundStartRef.current;
+          const elapsedMin = elapsedMs / 1000 / 60;
+          backgroundStartRef.current = null;
+
+          setUsage(prev => {
+            const newUsage = {
+              ...prev,
+              [currentTracking]: (prev[currentTracking] || 0) + elapsedMin,
+            };
+            saveAppUsage(newUsage); // persist immediately
+
+            // Check limit after returning
+            const app = appsRef.current.find(a => a.id === currentTracking);
+            const offset = newUsage[`${currentTracking}_offset`] || 0;
+            const effectiveLimit = app ? app.limit + offset : 0;
+            if (app && newUsage[currentTracking] >= effectiveLimit) {
+              stopTracking();
+              setBlockedApp({ ...app, used: Math.floor(newUsage[currentTracking]) });
+            } else {
+              // Restart foreground interval
+              _startInterval(currentTracking);
+            }
+            return newUsage;
+          });
+
+          setTrackingSeconds(s => s + Math.floor(elapsedMs / 1000));
+        }
+      }
     });
     return () => sub.remove();
-  }, [trackingApp]);
+  }, []); // intentionally empty — uses refs
 
-  // Tracking timer - adds to usage every second
+  // ─── Foreground interval ───────────────────────────────────────────────────
+  const _startInterval = (appId) => {
+    clearInterval(trackingRef.current);
+    trackingRef.current = setInterval(() => {
+      setTrackingSeconds(s => s + 1);
+      setUsage(prev => {
+        const newUsage = { ...prev, [appId]: (prev[appId] || 0) + (1 / 60) };
+        const app = appsRef.current.find(a => a.id === appId);
+        const offset = newUsage[`${appId}_offset`] || 0;
+        const effectiveLimit = app ? app.limit + offset : 0;
+        if (app && newUsage[appId] >= effectiveLimit) {
+          stopTracking();
+          setBlockedApp({ ...app, used: Math.floor(newUsage[appId]) });
+        }
+        return newUsage;
+      });
+    }, 1000);
+  };
+
   useEffect(() => {
     if (trackingApp) {
-      trackingRef.current = setInterval(() => {
-        setTrackingSeconds(s => s + 1);
-        setUsage(prev => {
-          const newUsage = { ...prev, [trackingApp]: (prev[trackingApp] || 0) + (1 / 60) };
-          // Check if over limit
-          const app = apps.find(a => a.id === trackingApp);
-          const offset = newUsage[`${trackingApp}_offset`] || 0;
-          const effectiveLimit = app ? app.limit + offset : 0;
-          if (app && newUsage[trackingApp] >= effectiveLimit) {
-            stopTracking();
-            setBlockedApp({ ...app, used: Math.floor(newUsage[trackingApp]) });
-          }
-          return newUsage;
-        });
-      }, 1000);
+      _startInterval(trackingApp);
     } else {
       clearInterval(trackingRef.current);
     }
     return () => clearInterval(trackingRef.current);
-  }, [trackingApp, apps]);
+  }, [trackingApp]);
 
   const getUsedMinutes = (appId) => usage[appId] || 0;
   const getOffset = (appId) => usage[`${appId}_offset`] || 0;
@@ -112,6 +172,7 @@ export default function AppLimitsScreen() {
   const stopTracking = () => {
     setTrackingApp(null);
     clearInterval(trackingRef.current);
+    backgroundStartRef.current = null;
   };
 
   const toggleApp = (id) => setApps(prev => prev.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
@@ -127,6 +188,19 @@ export default function AppLimitsScreen() {
     if (!val || val < 1 || val > 600) { Alert.alert('Invalid', 'Enter 1–600 minutes'); return; }
     setApps(prev => prev.map(a => a.id === editingApp.id ? { ...a, limit: val } : a));
     setShowEditModal(false);
+  };
+
+  // ─── Pro / 2x XP toggle ───────────────────────────────────────────────────
+  const handleProToggle = async () => {
+    if (isPro) {
+      await cancelSubscription();
+      setIsPro(false);
+      Alert.alert('Pro deaktiviert', '2x XP ist jetzt aus.');
+    } else {
+      await activateSubscription();
+      setIsPro(true);
+      Alert.alert('Pro aktiviert! 🎉', 'Du bekommst jetzt 2x XP für alle Habits!');
+    }
   };
 
   const filteredApps = filter === 'all' ? apps : apps.filter(a => a.category === filter);
@@ -148,8 +222,16 @@ export default function AppLimitsScreen() {
               <Text style={styles.pageTitle}>App Limits</Text>
               <Text style={styles.pageSubtitle}>Daily screen time control</Text>
             </View>
-            <View style={styles.xpBadge}>
-              <Text style={styles.xpBadgeText}>⚡ {xp} XP</Text>
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              <View style={styles.xpBadge}>
+                <Text style={styles.xpBadgeText}>⚡ {xp} XP</Text>
+              </View>
+              {/* ─── 2x XP Pro Badge ─── */}
+              <TouchableOpacity onPress={handleProToggle} style={[styles.proBadge, isPro && styles.proBadgeActive]}>
+                <Text style={[styles.proBadgeText, isPro && styles.proBadgeTextActive]}>
+                  {isPro ? '⭐ 2x XP AN' : '⭐ 2x XP'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </FadeIn>
@@ -192,6 +274,21 @@ export default function AppLimitsScreen() {
           </Card>
         </FadeIn>
 
+        {/* ─── Auto-Tracking Hint ─── */}
+        <FadeIn delay={130}>
+          <Card style={styles.xpInfoCard}>
+            <View style={styles.xpInfoRow}>
+              <Text style={{ fontSize: 20 }}>📱</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.xpInfoTitle}>Auto-Tracking</Text>
+                <Text style={styles.xpInfoSub}>
+                  Tippe ▶ bei einer App um das Tracking zu starten. Die Zeit läuft auch im Hintergrund weiter — egal ob du in TikTok oder einer anderen App bist.
+                </Text>
+              </View>
+            </View>
+          </Card>
+        </FadeIn>
+
         {/* Active tracking */}
         {trackingApp && (
           <FadeIn delay={0}>
@@ -200,7 +297,7 @@ export default function AppLimitsScreen() {
               <View style={styles.trackingRow}>
                 <View style={styles.trackingDot} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.trackingLabel}>Tracking</Text>
+                  <Text style={styles.trackingLabel}>Tracking (auch im Hintergrund)</Text>
                   <Text style={styles.trackingApp}>{apps.find(a => a.id === trackingApp)?.name}</Text>
                 </View>
                 <Text style={styles.trackingTime}>{Math.floor(trackingSeconds / 60)}:{String(trackingSeconds % 60).padStart(2, '0')}</Text>
@@ -372,6 +469,10 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontSize: Typography.sm, color: Colors.textSecondary, marginTop: 4 },
   xpBadge: { paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.warning + '22', borderWidth: 1, borderColor: Colors.warning + '44' },
   xpBadgeText: { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.warning },
+  proBadge: { paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: Colors.bgHighlight, borderWidth: 1, borderColor: Colors.border },
+  proBadgeActive: { backgroundColor: '#6C63FF22', borderColor: '#6C63FF88' },
+  proBadgeText: { fontSize: Typography.xs, fontWeight: Typography.bold, color: Colors.textMuted },
+  proBadgeTextActive: { color: '#A29BFE' },
   overviewCard: { marginBottom: Spacing.sm, padding: Spacing.lg, overflow: 'hidden' },
   overviewLabel: { fontSize: Typography.xs, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
   overviewValue: { fontSize: Typography.xxxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -1, marginTop: 4 },
