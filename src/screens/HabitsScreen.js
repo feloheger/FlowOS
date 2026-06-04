@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, FadeIn, ProgressBar } from '../components/UI';
-import { saveHabits, loadHabits, checkAndResetDaily } from '../data/storage';
+import { saveHabits, loadHabits, checkAndResetDaily, addXP } from '../data/storage';
 
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -234,10 +234,19 @@ export default function HabitsScreen() {
     setShowVerifyModal(true);
   };
 
-  const completeHabit = () => {
+  const completeHabit = async () => {
     let resultText = '';
+    let xpToAward = verifyingHabit.xp;
+
     if (verifyingHabit.verifyType === 'gps') {
       resultText = `${runDistance.toFixed(2)} km · ${formatTime(runSeconds)} · ${getPace()} /km`;
+      // 15 XP per 30min of running (must run at least 30min)
+      const minutesRun = runSeconds / 60;
+      if (minutesRun < 30) {
+        xpToAward = 0; // No XP if under 30 min
+      } else {
+        xpToAward = Math.floor(minutesRun / 30) * 15;
+      }
     } else if (verifyingHabit.verifyType === 'timer') {
       resultText = `${formatTime(timerSeconds)}`;
     } else if (verifyingHabit.verifyType === 'counter') {
@@ -253,9 +262,23 @@ export default function HabitsScreen() {
     stopGPS();
     setTimerActive(false);
 
+    // Award XP (addXP handles 2x multiplier for Pro users)
+    let earnedXP = xpToAward;
+    if (xpToAward > 0) {
+      const result = await addXP(xpToAward);
+      earnedXP = result.earned;
+      if (result.multiplier > 1) {
+        resultText += ` · ⚡ ${earnedXP} XP (2x!)`;
+      } else {
+        resultText += ` · +${earnedXP} XP`;
+      }
+    } else if (verifyingHabit.verifyType === 'gps') {
+      resultText += ' · Run at least 30min for XP';
+    }
+
     setHabits(prev => prev.map(h =>
       h.id === verifyingHabit.id
-        ? { ...h, completedToday: true, streak: h.streak + 1, weekLog: [...h.weekLog.slice(1), true], lastResult: resultText }
+        ? { ...h, completedToday: true, streak: h.streak + 1, weekLog: [...h.weekLog.slice(1), true], lastResult: resultText, lastXP: earnedXP }
         : h
     ));
     setShowVerifyModal(false);
@@ -503,6 +526,15 @@ export default function HabitsScreen() {
                       </View>
                     </View>
 
+                    {/* XP rule hint */}
+                    <View style={styles.xpRuleBox}>
+                      <Text style={styles.xpRuleText}>
+                        {runSeconds < 1800
+                          ? `⚡ Run ${Math.ceil((1800 - runSeconds) / 60)}min more for 15 XP`
+                          : `⚡ ${Math.floor(runSeconds / 1800) * 15} XP earned (${Math.floor(runSeconds / 60)}min)`}
+                      </Text>
+                    </View>
+
                     {/* GPS Status */}
                     <View style={styles.gpsStatus}>
                       <View style={[styles.gpsDot, { backgroundColor: gpsActive && !gpsPaused ? Colors.success : gpsPaused ? Colors.warning : Colors.textMuted }]} />
@@ -667,6 +699,9 @@ const styles = StyleSheet.create({
   weekDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.bgHighlight, borderWidth: 1, borderColor: Colors.border },
   weekDotToday: { borderColor: Colors.accent, borderWidth: 2 },
   weekLabel: { fontSize: 9, color: Colors.textMuted },
+
+  xpRuleBox: { backgroundColor: Colors.warning + '22', borderRadius: Radius.sm, paddingHorizontal: Spacing.md, paddingVertical: 6, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.warning + '44' },
+  xpRuleText: { fontSize: Typography.xs, color: Colors.warning, fontWeight: Typography.semibold, textAlign: 'center' },
 
   // GPS
   gpsSection: { alignItems: 'center', paddingVertical: Spacing.md },
