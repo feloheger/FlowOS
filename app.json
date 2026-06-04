@@ -3,10 +3,10 @@
     "name": "FlowOS",
     "slug": "flowos",
     "version": "1.0.0",
-    "owner": "feloheger",
+    "owner": "felixos",
     "extra": {
       "eas": {
-        "projectId": "c8ebbc76-d951-4ac1-9136-30858a97a3fa"
+        "projectId": "300fb5eb-6804-4ecb-b110-b920e5524e46"
       }
     },
     "orientation": "portrait",
