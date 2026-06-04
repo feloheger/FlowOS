@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, FadeIn, ProgressBar } from '../components/UI';
-import { saveHabits, loadHabits, checkAndResetDaily, addXP } from '../data/storage';
+import { saveHabits, loadHabits, checkAndResetDaily, addXP, loadXP, loadSubscription } from '../data/storage';
 
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -124,6 +124,8 @@ export default function HabitsScreen() {
 
   // Counter
   const [counterValue, setCounterValue] = useState(0);
+  const [totalStoredXP, setTotalStoredXP] = useState(0);
+  const [isPro, setIsPro] = useState(false);
 
   // Celebration
   const celebAnim = useRef(new Animated.Value(0)).current;
@@ -133,7 +135,11 @@ export default function HabitsScreen() {
     (async () => {
       await checkAndResetDaily();
       const saved = await loadHabits();
+      const currentXP = await loadXP();
+      const sub = await loadSubscription();
       setHabits(saved);
+      setTotalStoredXP(currentXP);
+      setIsPro(sub?.active || false);
       setLoading(false);
     })();
   }, []);
@@ -215,7 +221,7 @@ export default function HabitsScreen() {
     setGpsPaused(false);
   };
 
-  const totalXP = habits.filter(h => h.completedToday).reduce((s, h) => s + h.xp, 0);
+  const totalXP = habits.filter(h => h.completedToday).reduce((s, h) => s + (h.lastXP || h.xp), 0);
   const totalPossibleXP = habits.reduce((s, h) => s + h.xp, 0);
   const longestStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak)) : 0;
 
@@ -267,6 +273,9 @@ export default function HabitsScreen() {
     if (xpToAward > 0) {
       const result = await addXP(xpToAward);
       earnedXP = result.earned;
+      // Refresh stored XP so display updates correctly
+      const newStoredXP = await loadXP();
+      setTotalStoredXP(newStoredXP);
       if (result.multiplier > 1) {
         resultText += ` · ⚡ ${earnedXP} XP (2x!)`;
       } else {
@@ -349,7 +358,7 @@ export default function HabitsScreen() {
       }]}>
         <Text style={styles.celebEmoji}>🎉</Text>
         <Text style={styles.celebText}>Habit Complete!</Text>
-        <Text style={styles.celebXP}>+{verifyingHabit?.xp || 0} XP</Text>
+        <Text style={styles.celebXP}>+{verifyingHabit?.lastXP || verifyingHabit?.xp || 0} XP{isPro ? ' (2x!)' : ''}</Text>
       </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -371,8 +380,8 @@ export default function HabitsScreen() {
               <LinearGradient colors={['#58CC0222', '#0000']} style={StyleSheet.absoluteFill} />
               <View style={styles.xpTop}>
                 <View>
-                  <Text style={styles.xpLabel}>Today's XP</Text>
-                  <Text style={styles.xpValue}>{totalXP} <Text style={styles.xpMax}>/ {totalPossibleXP} XP</Text></Text>
+                  <Text style={styles.xpLabel}>Today's XP{isPro ? '  ⭐ 2x aktiv' : ''}</Text>
+                  <Text style={styles.xpValue}>{totalXP} <Text style={styles.xpMax}>/ {totalPossibleXP} XP · Gesamt: {totalStoredXP}</Text></Text>
                 </View>
                 <View style={styles.streakBadge}>
                   <Text style={styles.streakFire}>🔥</Text>

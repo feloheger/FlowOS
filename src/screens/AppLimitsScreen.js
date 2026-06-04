@@ -178,6 +178,16 @@ export default function AppLimitsScreen() {
   const toggleApp = (id) => setApps(prev => prev.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
 
   const openEdit = (app) => {
+    const usedMin = getUsedMinutes(app.id);
+    const effectiveLimit = getEffectiveLimit(app);
+    if (usedMin >= effectiveLimit) {
+      Alert.alert(
+        'Limit gesperrt 🔒',
+        'Du kannst das Limit nicht erhöhen während es erreicht ist. Verwende XP um Zeit zu verlängern, oder warte bis Mitternacht.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     setEditingApp(app);
     setNewLimit(String(app.limit));
     setShowEditModal(true);
