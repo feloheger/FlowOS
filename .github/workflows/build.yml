@@ -1,4 +1,4 @@
-name: Build APK
+name: Build iOS App
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build iOS App
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,7 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build APK
-        run: EAS_NO_VCS=1 eas build --platform android --profile preview --non-interactive
+      - name: Build iOS
+        # Änderung: Plattform auf "ios" geändert
+        run: EAS_NO_VCS=1 eas build --platform ios --profile preview --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
