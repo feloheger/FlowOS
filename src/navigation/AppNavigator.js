@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,25 +6,76 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { loadSubscription } from '../data/storage';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import ProjectsScreen from '../screens/ProjectsScreen';
 import HabitsScreen from '../screens/HabitsScreen';
 import AppLimitsScreen from '../screens/AppLimitsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import GoalsScreen from '../screens/GoalsScreen';
+import PaywallScreen, { LockedScreen } from '../screens/PaywallScreen';
 
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
 
 const TABS = [
-  { name: 'Dashboard', icon: 'home', label: 'Home' },
-  { name: 'Projects', icon: 'folder', label: 'Projects' },
-  { name: 'Habits', icon: 'flame', label: 'Habits' },
-  { name: 'AppLimits', icon: 'lock-closed', label: 'Limits' },
-  { name: 'Settings', icon: 'settings', label: 'Settings' },
+  { name: 'Dashboard', icon: 'home', label: 'Home', pro: false },
+  { name: 'Projects', icon: 'folder', label: 'Projects', pro: true },
+  { name: 'Habits', icon: 'flame', label: 'Habits', pro: false },
+  { name: 'AppLimits', icon: 'lock-closed', label: 'Limits', pro: false },
+  { name: 'Settings', icon: 'settings', label: 'Settings', pro: false },
 ];
 
-function CustomTabBar({ state, descriptors, navigation }) {
+function SwipeWrapper({ children, navigation, currentIndex, hasSubscription }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-10, 10])
+    .onEnd((e) => {
+      const THRESHOLD = width * 0.3;
+      if (e.translationX < -THRESHOLD && currentIndex < TABS.length - 1) {
+        Animated.timing(translateX, { toValue: -60, duration: 150, useNativeDriver: true }).start(() => {
+          translateX.setValue(0);
+          navigation.navigate(TABS[currentIndex + 1].name);
+        });
+      } else if (e.translationX > THRESHOLD && currentIndex > 0) {
+        Animated.timing(translateX, { toValue: 60, duration: 150, useNativeDriver: true }).start(() => {
+          translateX.setValue(0);
+          navigation.navigate(TABS[currentIndex - 1].name);
+        });
+      } else {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
+      }
+    });
+
+  return (
+    <GestureDetector gesture={swipe}>
+      <Animated.View style={[{ flex: 1 }, { transform: [{ translateX }] }]}>
+        {children}
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+// HOC for Pro-gated screens
+function ProGatedScreen({ Component, tabName, index, navigation, hasSubscription, onShowPaywall }) {
+  if (!hasSubscription) {
+    return (
+      <SwipeWrapper navigation={navigation} currentIndex={index}>
+        <LockedScreen tabName={tabName} onUnlock={onShowPaywall} />
+      </SwipeWrapper>
+    );
+  }
+  return (
+    <SwipeWrapper navigation={navigation} currentIndex={index}>
+      <Component navigation={navigation} />
+    </SwipeWrapper>
+  );
+}
+
+function CustomTabBar({ state, descriptors, navigation, hasSubscription }) {
   return (
     <View style={styles.tabBarWrapper}>
       <BlurView intensity={40} tint="dark" style={styles.tabBar}>
@@ -45,6 +96,11 @@ function CustomTabBar({ state, descriptors, navigation }) {
                     size={22}
                     color={isFocused ? Colors.accent : Colors.textMuted}
                   />
+                  {tab.pro && !hasSubscription && (
+                    <View style={styles.proBadge}>
+                      <Text style={styles.proBadgeText}>PRO</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
                   {tab.label}
@@ -58,43 +114,6 @@ function CustomTabBar({ state, descriptors, navigation }) {
   );
 }
 
-// Swipe wrapper - wraps each screen with swipe gesture
-function SwipeWrapper({ children, navigation, currentIndex }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-
-  const swipe = Gesture.Pan()
-    .activeOffsetX([-20, 20])
-    .failOffsetY([-10, 10])
-    .onEnd((e) => {
-      const THRESHOLD = width * 0.3;
-      if (e.translationX < -THRESHOLD && currentIndex < TABS.length - 1) {
-        // Swipe left → next screen
-        Animated.timing(translateX, { toValue: -60, duration: 150, useNativeDriver: true }).start(() => {
-          translateX.setValue(0);
-          navigation.navigate(TABS[currentIndex + 1].name);
-        });
-      } else if (e.translationX > THRESHOLD && currentIndex > 0) {
-        // Swipe right → previous screen
-        Animated.timing(translateX, { toValue: 60, duration: 150, useNativeDriver: true }).start(() => {
-          translateX.setValue(0);
-          navigation.navigate(TABS[currentIndex - 1].name);
-        });
-      } else {
-        // Snap back
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
-      }
-    });
-
-  return (
-    <GestureDetector gesture={swipe}>
-      <Animated.View style={[{ flex: 1 }, { transform: [{ translateX }] }]}>
-        {children}
-      </Animated.View>
-    </GestureDetector>
-  );
-}
-
-// Wrap each screen component with swipe
 function withSwipe(Component, index) {
   return function WrappedScreen({ navigation, ...props }) {
     return (
@@ -105,26 +124,55 @@ function withSwipe(Component, index) {
   };
 }
 
-const DashboardWithSwipe = withSwipe(DashboardScreen, 0);
-const ProjectsWithSwipe = withSwipe(ProjectsScreen, 1);
-const HabitsWithSwipe = withSwipe(HabitsScreen, 2);
-const AppLimitsWithSwipe = withSwipe(AppLimitsScreen, 3);
-const SettingsWithSwipe = withSwipe(SettingsScreen, 4);
-
 export default function AppNavigator() {
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  useEffect(() => {
+    loadSubscription().then(sub => setHasSubscription(sub?.active || false));
+  }, []);
+
+  const DashboardWrapped = withSwipe(DashboardScreen, 0);
+  const HabitsWrapped = withSwipe(HabitsScreen, 2);
+  const AppLimitsWrapped = withSwipe(AppLimitsScreen, 3);
+  const SettingsWrapped = withSwipe(SettingsScreen, 4);
+
+  // Pro-gated screens
+  const ProjectsWrapped = ({ navigation }) => (
+    <ProGatedScreen
+      Component={ProjectsScreen}
+      tabName="Projects"
+      index={1}
+      navigation={navigation}
+      hasSubscription={hasSubscription}
+      onShowPaywall={() => setShowPaywall(true)}
+    />
+  );
+
   return (
-    <NavigationContainer>
-      <Tab.Navigator
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{ headerShown: false, animation: 'shift' }}
-      >
-        <Tab.Screen name="Dashboard" component={DashboardWithSwipe} />
-        <Tab.Screen name="Projects" component={ProjectsWithSwipe} />
-        <Tab.Screen name="Habits" component={HabitsWithSwipe} />
-        <Tab.Screen name="AppLimits" component={AppLimitsWithSwipe} />
-        <Tab.Screen name="Settings" component={SettingsWithSwipe} />
-      </Tab.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer>
+        <Tab.Navigator
+          tabBar={(props) => <CustomTabBar {...props} hasSubscription={hasSubscription} />}
+          screenOptions={{ headerShown: false }}
+        >
+          <Tab.Screen name="Dashboard" component={DashboardWrapped} />
+          <Tab.Screen name="Projects" component={ProjectsWrapped} />
+          <Tab.Screen name="Habits" component={HabitsWrapped} />
+          <Tab.Screen name="AppLimits" component={AppLimitsWrapped} />
+          <Tab.Screen name="Settings" component={SettingsWrapped} />
+        </Tab.Navigator>
+      </NavigationContainer>
+
+      <PaywallScreen
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onActivate={() => {
+          setHasSubscription(true);
+          setShowPaywall(false);
+        }}
+      />
+    </>
   );
 }
 
@@ -137,4 +185,6 @@ const styles = StyleSheet.create({
   tabIconWrapActive: { backgroundColor: Colors.accentSoft },
   tabLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: Typography.medium },
   tabLabelActive: { color: Colors.accent, fontWeight: Typography.semibold },
+  proBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: Colors.warning, borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 },
+  proBadgeText: { fontSize: 7, fontWeight: Typography.heavy, color: '#000', letterSpacing: 0.3 },
 });
