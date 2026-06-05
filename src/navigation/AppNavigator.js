@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Colors, Typography, Spacing, Radius } from '../theme';
-import { loadSubscription } from '../data/storage';
-import { hasUsagePermission, hasOverlayPermission, startBlockerService } from '../native/AppBlocker';
+import { loadSubscription, loadAppLimits, loadAppUsage, saveAppLimits } from '../data/storage';
+import { hasUsagePermission, hasOverlayPermission, startBlockerService, updateBlocklist } from '../native/AppBlocker';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import ProjectsScreen from '../screens/ProjectsScreen';
@@ -147,6 +147,31 @@ export default function AppNavigator() {
       if (usage && overlay) {
         // Alles OK — Blocker-Service starten
         await startBlockerService();
+        // Sofort Blocklist pushen damit der Service weiß welche Apps er tracken soll
+        try {
+          const DEFAULT_APPS = [
+            { id: 'instagram', name: 'Instagram', limit: 60, enabled: true, packageName: 'com.instagram.android' },
+            { id: 'tiktok', name: 'TikTok', limit: 45, enabled: true, packageName: 'com.zhiliaoapp.musically' },
+            { id: 'youtube', name: 'YouTube', limit: 60, enabled: true, packageName: 'com.google.android.youtube' },
+            { id: 'twitter', name: 'Twitter / X', limit: 30, enabled: true, packageName: 'com.twitter.android' },
+            { id: 'netflix', name: 'Netflix', limit: 90, enabled: false, packageName: 'com.netflix.mediaclient' },
+            { id: 'reddit', name: 'Reddit', limit: 30, enabled: true, packageName: 'com.reddit.frontpage' },
+            { id: 'whatsapp', name: 'WhatsApp', limit: 45, enabled: false, packageName: 'com.whatsapp' },
+            { id: 'snapchat', name: 'Snapchat', limit: 30, enabled: false, packageName: 'com.snapchat.android' },
+          ];
+          let apps = await loadAppLimits();
+          if (!apps || apps.length === 0) {
+            // Erste Start — Default-Apps speichern
+            apps = DEFAULT_APPS;
+            await saveAppLimits(apps);
+          }
+          const usageData = await loadAppUsage();
+          const limits = {};
+          apps.forEach(app => {
+            limits[app.id] = app.limit + (usageData[app.id + '_offset'] || 0);
+          });
+          await updateBlocklist(apps, usageData || {}, limits);
+        } catch (e) {}
         setPermissionsReady(true);
       } else {
         // Permissions fehlen — Setup-Screen anzeigen
