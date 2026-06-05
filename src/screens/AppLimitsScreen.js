@@ -45,6 +45,7 @@ export default function AppLimitsScreen() {
 
   const appsRef = useRef([]);
   const pollRef = useRef(null);
+  const [debugInfo, setDebugInfo] = useState('Initialisiere...');
 
   useEffect(() => { appsRef.current = apps; }, [apps]);
 
@@ -73,6 +74,7 @@ export default function AppLimitsScreen() {
     pollRef.current = setInterval(async () => {
       try {
         const nativeUsage = await getNativeUsageData();
+        setDebugInfo('🔄 Letzte Abfrage: ' + new Date().toLocaleTimeString() + ' · ' + Object.keys(nativeUsage||{}).length + ' Einträge');
         if (nativeUsage && Object.keys(nativeUsage).length > 0) {
           // Map package names back to app ids
           const mapped = {};
@@ -131,7 +133,9 @@ export default function AppLimitsScreen() {
     appList.forEach(app => {
       limits[app.id] = app.limit + (usageData[app.id + '_offset'] || 0);
     });
-    updateBlocklist(appList, usageData, limits).catch(() => {});
+    updateBlocklist(appList, usageData, limits)
+      .then(() => setDebugInfo('✅ Service aktiv · ' + appList.filter(a=>a.enabled).length + ' Apps getrackt'))
+      .catch(e => setDebugInfo('❌ Service Fehler: ' + e?.message));
   };
 
   const getUsedMinutes = (appId) => usage[appId] || 0;
@@ -239,6 +243,16 @@ export default function AppLimitsScreen() {
               <Text style={styles.resetNote}>⏰ Reset um Mitternacht</Text>
             </View>
           </Card>
+        </FadeIn>
+
+        {/* Debug Info */}
+        <FadeIn delay={90}>
+          <TouchableOpacity onPress={async () => { const d = await getNativeUsageData(); setDebugInfo(JSON.stringify(d)); }}>
+            <View style={{ backgroundColor: '#111122', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <Text style={{ color: '#6C63FF', fontSize: 11 }}>🔧 Debug: {debugInfo}</Text>
+              <Text style={{ color: '#555566', fontSize: 10 }}>Tippen für rohe Usage-Daten</Text>
+            </View>
+          </TouchableOpacity>
         </FadeIn>
 
         {/* XP Extend Info */}
