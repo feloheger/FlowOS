@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { loadSubscription } from '../data/storage';
+import { hasUsagePermission, hasOverlayPermission, startBlockerService } from '../native/AppBlocker';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import ProjectsScreen from '../screens/ProjectsScreen';
@@ -15,6 +16,7 @@ import AppLimitsScreen from '../screens/AppLimitsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import PaywallScreen, { LockedScreen } from '../screens/PaywallScreen';
+import PermissionSetupScreen from '../screens/PermissionSetupScreen';
 
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
@@ -59,7 +61,6 @@ function SwipeWrapper({ children, navigation, currentIndex, hasSubscription }) {
   );
 }
 
-// HOC for Pro-gated screens
 function ProGatedScreen({ Component, tabName, index, navigation, hasSubscription, onShowPaywall }) {
   if (!hasSubscription) {
     return (
@@ -127,17 +128,53 @@ function withSwipe(Component, index) {
 export default function AppNavigator() {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  // null = noch nicht gecheckt, false = Permissions fehlen, true = alles OK
+  const [permissionsReady, setPermissionsReady] = useState(null);
 
   useEffect(() => {
     loadSubscription().then(sub => setHasSubscription(sub?.active || false));
+
+    // Permissions checken beim Start
+    checkPermissions();
   }, []);
+
+  const checkPermissions = async () => {
+    try {
+      const [usage, overlay] = await Promise.all([
+        hasUsagePermission(),
+        hasOverlayPermission(),
+      ]);
+      if (usage && overlay) {
+        // Alles OK — Blocker-Service starten
+        await startBlockerService();
+        setPermissionsReady(true);
+      } else {
+        // Permissions fehlen — Setup-Screen anzeigen
+        setPermissionsReady(false);
+      }
+    } catch (e) {
+      // Natives Modul nicht verfügbar (z.B. in Expo Go) — einfach weitermachen
+      setPermissionsReady(true);
+    }
+  };
+
+  // Noch am laden
+  if (permissionsReady === null) return null;
+
+  // Permissions fehlen → Setup-Screen zeigen
+  if (permissionsReady === false) {
+    return (
+      <PermissionSetupScreen
+        onComplete={() => setPermissionsReady(true)}
+      />
+    );
+  }
 
   const DashboardWrapped = withSwipe(DashboardScreen, 0);
   const HabitsWrapped = withSwipe(HabitsScreen, 2);
   const AppLimitsWrapped = withSwipe(AppLimitsScreen, 3);
   const SettingsWrapped = withSwipe(SettingsScreen, 4);
 
-  // Pro-gated screens
   const ProjectsWrapped = ({ navigation }) => (
     <ProGatedScreen
       Component={ProjectsScreen}
