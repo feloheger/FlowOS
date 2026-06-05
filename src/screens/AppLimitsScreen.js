@@ -12,10 +12,7 @@ import {
   checkAndResetDaily, loadXP, loadSubscription, activateSubscription, cancelSubscription,
 } from '../data/storage';
 import AppBlockedScreen from './AppBlockedScreen';
-<<<<<<< HEAD
 import { updateBlocklist, setupAndStart, APP_PACKAGE_NAMES } from '../native/AppBlocker';
-=======
->>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
 
 const DEFAULT_APPS = [
   { id: 'instagram', name: 'Instagram', icon: 'logo-instagram', color: '#E1306C', limit: 60, enabled: true, category: 'social' },
@@ -74,17 +71,13 @@ export default function AppLimitsScreen() {
       setXp(savedXP);
       setIsPro(sub?.active || false);
       setLoading(false);
-<<<<<<< HEAD
 
       // Start background blocker service (handles permissions check internally)
       setupAndStart();
-=======
->>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
     })();
   }, []);
 
   useEffect(() => { if (!loading) saveAppLimits(apps); }, [apps]);
-<<<<<<< HEAD
   useEffect(() => {
     if (!loading) {
       saveAppUsage(usage);
@@ -96,9 +89,6 @@ export default function AppLimitsScreen() {
       updateBlocklist(apps, usage, limits);
     }
   }, [usage, apps]);
-=======
-  useEffect(() => { if (!loading) saveAppUsage(usage); }, [usage]);
->>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
 
   // ─── AppState listener: automatic background time accumulation ─────────────
   useEffect(() => {
