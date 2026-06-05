@@ -3,6 +3,12 @@
     "name": "FlowOS",
     "slug": "flowos",
     "version": "1.0.0",
+    "owner": "felixos",
+    "extra": {
+      "eas": {
+        "projectId": "300fb5eb-6804-4ecb-b110-b920e5524e46"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,11 +26,28 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0F"
       },
-      "package": "com.flowos.app"
+      "package": "com.flowos.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE",
+        "SYSTEM_ALERT_WINDOW",
+        "PACKAGE_USAGE_STATS",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "plugins": [
-      "expo-blur",
-      "expo-haptics"
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "FlowOS needs location to track your runs."
+        }
+      ],
+      [
+        "./modules/app-blocker/plugin",
+        {}
+      ]
     ]
   }
 }
