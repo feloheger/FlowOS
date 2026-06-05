@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, FadeIn } from '../components/UI';
 import { saveData, loadData } from '../data/storage';
+import { useAppContext } from '../AppContext';
 
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -33,6 +34,7 @@ const UNITS = [
 ];
 
 export default function SettingsScreen() {
+  const { themeId, setTheme: setGlobalTheme, language: globalLang, setLang: setGlobalLang } = useAppContext();
   const [language, setLanguage] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [units, setUnits] = useState('metric');
@@ -50,8 +52,8 @@ export default function SettingsScreen() {
     (async () => {
       const s = await loadData('flowos_settings', null);
       if (s) {
-        setLanguage(s.language || 'en');
-        setTheme(s.theme || 'dark');
+        setLanguage(s.language || globalLang || 'en');
+        setTheme(s.theme || themeId || 'dark');
         setUnits(s.units || 'metric');
         setNotifications(s.notifications ?? true);
         setHabitReminder(s.habitReminder ?? true);
@@ -229,7 +231,7 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={lang.code}
                 style={[styles.optionRow, language === lang.code && styles.optionRowActive]}
-                onPress={() => { setLanguage(lang.code); save({ language: lang.code }); setShowLangModal(false); }}
+                onPress={() => { setLanguage(lang.code); setGlobalLang(lang.code); setShowLangModal(false); }}
               >
                 <Text style={styles.optionFlag}>{lang.flag}</Text>
                 <Text style={[styles.optionLabel, language === lang.code && { color: Colors.accent }]}>{lang.label}</Text>
@@ -255,7 +257,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   key={t.id}
                   style={[styles.themeCard, theme === t.id && styles.themeCardActive]}
-                  onPress={() => { setTheme(t.id); save({ theme: t.id }); setShowThemeModal(false); }}
+                  onPress={() => { setTheme(t.id); setGlobalTheme(t.id); setShowThemeModal(false); }}
                 >
                   <Text style={styles.themeEmoji}>{t.icon}</Text>
                   <Text style={[styles.themeLabel, theme === t.id && { color: Colors.accent }]}>{t.label}</Text>
