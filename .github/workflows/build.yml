@@ -19,6 +19,6 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
       - name: Build APK
-        run: EAS_NO_VCS=1 eas build --platform android --profile development --non-interactive
+        run: EAS_NO_VCS=1 eas build --platform android --profile preview --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
