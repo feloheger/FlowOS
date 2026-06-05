@@ -4,34 +4,40 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
-import { Colors } from './src/theme';
+import { AppProvider, useAppContext } from './src/AppContext';
 
-export default function App() {
+function AppInner() {
+  const { colors, themeId } = useAppContext();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
+      toValue: 1, duration: 600, useNativeDriver: true,
     }).start();
   }, []);
 
   return (
+    <>
+      <StatusBar style={themeId === 'light' ? 'dark' : 'light'} />
+      <Animated.View style={[styles.root, { opacity: fadeAnim, backgroundColor: colors.bg }]}>
+        <AppNavigator />
+      </Animated.View>
+    </>
+  );
+}
+
+export default function App() {
+  return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <Animated.View style={[styles.root, { opacity: fadeAnim }]}>
-          <AppNavigator />
-        </Animated.View>
+        <AppProvider>
+          <AppInner />
+        </AppProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
+  root: { flex: 1 },
 });
