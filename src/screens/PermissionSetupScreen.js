@@ -5,11 +5,24 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { Linking } from 'react-native';
 import {
   hasUsagePermission, hasOverlayPermission,
-  requestUsagePermission, requestOverlayPermission,
   startBlockerService,
 } from '../native/AppBlocker';
+
+// Opens Android system settings directly
+const openUsageSettings = () => {
+  Linking.sendIntent('android.settings.USAGE_ACCESS_SETTINGS').catch(() => {
+    Linking.openSettings();
+  });
+};
+
+const openOverlaySettings = () => {
+  Linking.sendIntent('android.settings.action.MANAGE_OVERLAY_PERMISSION').catch(() => {
+    Linking.openSettings();
+  });
+};
 
 export default function PermissionSetupScreen({ onComplete }) {
   const [usagePerm, setUsagePerm] = useState(false);
@@ -67,7 +80,7 @@ export default function PermissionSetupScreen({ onComplete }) {
             </Text>
           </View>
           {!usagePerm && (
-            <TouchableOpacity style={styles.permBtn} onPress={requestUsagePermission}>
+            <TouchableOpacity style={styles.permBtn} onPress={openUsageSettings}>
               <Text style={styles.permBtnText}>Öffnen →</Text>
             </TouchableOpacity>
           )}
@@ -93,7 +106,7 @@ export default function PermissionSetupScreen({ onComplete }) {
             </Text>
           </View>
           {!overlayPerm && (
-            <TouchableOpacity style={[styles.permBtn, { backgroundColor: Colors.warning + '33' }]} onPress={requestOverlayPermission}>
+            <TouchableOpacity style={[styles.permBtn, { backgroundColor: Colors.warning + '33' }]} onPress={openOverlaySettings}>
               <Text style={[styles.permBtnText, { color: Colors.warning }]}>Öffnen →</Text>
             </TouchableOpacity>
           )}
