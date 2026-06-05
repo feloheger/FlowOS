@@ -5,24 +5,24 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
+import { Colors, Typography, Spacing, Radius } from '../theme';
 import { Card, FadeIn, ProgressBar, SectionHeader } from '../components/UI';
 import {
   saveAppLimits, loadAppLimits, saveAppUsage, loadAppUsage,
   checkAndResetDaily, loadXP, loadSubscription, activateSubscription, cancelSubscription,
 } from '../data/storage';
 import AppBlockedScreen from './AppBlockedScreen';
-import { updateBlocklist, setupAndStart, APP_PACKAGE_NAMES } from '../native/AppBlocker';
+import { updateBlocklist, getNativeUsageData } from '../native/AppBlocker';
 
 const DEFAULT_APPS = [
-  { id: 'instagram', name: 'Instagram', icon: 'logo-instagram', color: '#E1306C', limit: 60, enabled: true, category: 'social' },
-  { id: 'tiktok', name: 'TikTok', icon: 'musical-notes', color: '#FF0050', limit: 45, enabled: true, category: 'social' },
-  { id: 'youtube', name: 'YouTube', icon: 'logo-youtube', color: '#FF0000', limit: 60, enabled: true, category: 'entertainment' },
-  { id: 'twitter', name: 'Twitter / X', icon: 'logo-twitter', color: '#1DA1F2', limit: 30, enabled: true, category: 'social' },
-  { id: 'netflix', name: 'Netflix', icon: 'film', color: '#E50914', limit: 90, enabled: false, category: 'entertainment' },
-  { id: 'reddit', name: 'Reddit', icon: 'logo-reddit', color: '#FF4500', limit: 30, enabled: true, category: 'social' },
-  { id: 'whatsapp', name: 'WhatsApp', icon: 'logo-whatsapp', color: '#25D366', limit: 45, enabled: false, category: 'social' },
-  { id: 'snapchat', name: 'chatbubble', icon: 'chatbubble', color: '#FFFC00', limit: 30, enabled: false, category: 'social' },
+  { id: 'instagram', name: 'Instagram', icon: 'logo-instagram', color: '#E1306C', limit: 60, enabled: true, category: 'social', packageName: 'com.instagram.android' },
+  { id: 'tiktok', name: 'TikTok', icon: 'musical-notes', color: '#FF0050', limit: 45, enabled: true, category: 'social', packageName: 'com.zhiliaoapp.musically' },
+  { id: 'youtube', name: 'YouTube', icon: 'logo-youtube', color: '#FF0000', limit: 60, enabled: true, category: 'entertainment', packageName: 'com.google.android.youtube' },
+  { id: 'twitter', name: 'Twitter / X', icon: 'logo-twitter', color: '#1DA1F2', limit: 30, enabled: true, category: 'social', packageName: 'com.twitter.android' },
+  { id: 'netflix', name: 'Netflix', icon: 'film', color: '#E50914', limit: 90, enabled: false, category: 'entertainment', packageName: 'com.netflix.mediaclient' },
+  { id: 'reddit', name: 'Reddit', icon: 'logo-reddit', color: '#FF4500', limit: 30, enabled: true, category: 'social', packageName: 'com.reddit.frontpage' },
+  { id: 'whatsapp', name: 'WhatsApp', icon: 'logo-whatsapp', color: '#25D366', limit: 45, enabled: false, category: 'social', packageName: 'com.whatsapp' },
+  { id: 'snapchat', name: 'Snapchat', icon: 'chatbubble', color: '#FFFC00', limit: 30, enabled: false, category: 'social', packageName: 'com.snapchat.android' },
 ];
 
 function minutesToHM(min) {
@@ -40,25 +40,15 @@ export default function AppLimitsScreen() {
   const [newLimit, setNewLimit] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [trackingApp, setTrackingApp] = useState(null);
-  const [trackingSeconds, setTrackingSeconds] = useState(0);
   const [blockedApp, setBlockedApp] = useState(null);
   const [isPro, setIsPro] = useState(false);
-  const [showProModal, setShowProModal] = useState(false);
 
-  const trackingRef = useRef(null);
-  const appStateRef = useRef(AppState.currentState);
-  // ─── NEW: timestamp when app went to background ───────────────────────────
-  const backgroundStartRef = useRef(null);
-  const trackingAppRef = useRef(null); // mirror of trackingApp for use in callbacks
-  const appsRef = useRef([]);          // mirror of apps for use in callbacks
-  const usageRef = useRef({});         // mirror of usage for saving from callbacks
+  const appsRef = useRef([]);
+  const pollRef = useRef(null);
 
-  // Keep refs in sync
-  useEffect(() => { trackingAppRef.current = trackingApp; }, [trackingApp]);
   useEffect(() => { appsRef.current = apps; }, [apps]);
-  useEffect(() => { usageRef.current = usage; }, [usage]);
 
+  // ─── Load on mount ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       await checkAndResetDaily();
@@ -66,130 +56,93 @@ export default function AppLimitsScreen() {
       const savedUsage = await loadAppUsage();
       const savedXP = await loadXP();
       const sub = await loadSubscription();
-      setApps(savedLimits || DEFAULT_APPS);
+      const appList = savedLimits || DEFAULT_APPS;
+      setApps(appList);
       setUsage(savedUsage || {});
       setXp(savedXP);
       setIsPro(sub?.active || false);
       setLoading(false);
 
-      // Start background blocker service (handles permissions check internally)
-      setupAndStart();
+      // Push limits to native service immediately
+      pushToNative(appList, savedUsage || {});
     })();
   }, []);
 
-  useEffect(() => { if (!loading) saveAppLimits(apps); }, [apps]);
+  // ─── Poll native service every 5 seconds for live usage data ─────────────
   useEffect(() => {
-    if (!loading) {
-      saveAppUsage(usage);
-      // Push updated blocked status to native Android service
-      const limits = {};
-      apps.forEach(app => {
-        limits[app.id] = app.limit + (usage[app.id + '_offset'] || 0);
-      });
-      updateBlocklist(apps, usage, limits);
-    }
-  }, [usage, apps]);
-
-  // ─── AppState listener: automatic background time accumulation ─────────────
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', nextState => {
-      const prev = appStateRef.current;
-      appStateRef.current = nextState;
-
-      const currentTracking = trackingAppRef.current;
-
-      if (prev === 'active' && nextState !== 'active') {
-        // App going to background
-        if (currentTracking) {
-          backgroundStartRef.current = Date.now();
-          // Stop the foreground interval — time will be settled on return
-          clearInterval(trackingRef.current);
-        }
-      } else if (prev !== 'active' && nextState === 'active') {
-        // App coming back to foreground
-        if (currentTracking && backgroundStartRef.current) {
-          const elapsedMs = Date.now() - backgroundStartRef.current;
-          const elapsedMin = elapsedMs / 1000 / 60;
-          backgroundStartRef.current = null;
-
-          setUsage(prev => {
-            const newUsage = {
-              ...prev,
-              [currentTracking]: (prev[currentTracking] || 0) + elapsedMin,
-            };
-            saveAppUsage(newUsage); // persist immediately
-
-            // Check limit after returning
-            const app = appsRef.current.find(a => a.id === currentTracking);
-            const offset = newUsage[`${currentTracking}_offset`] || 0;
-            const effectiveLimit = app ? app.limit + offset : 0;
-            if (app && newUsage[currentTracking] >= effectiveLimit) {
-              stopTracking();
-              setBlockedApp({ ...app, used: Math.floor(newUsage[currentTracking]) });
-            } else {
-              // Restart foreground interval
-              _startInterval(currentTracking);
+    pollRef.current = setInterval(async () => {
+      try {
+        const nativeUsage = await getNativeUsageData();
+        if (nativeUsage && Object.keys(nativeUsage).length > 0) {
+          // Map package names back to app ids
+          const mapped = {};
+          appsRef.current.forEach(app => {
+            if (app.packageName && nativeUsage[app.packageName] !== undefined) {
+              mapped[app.id] = nativeUsage[app.packageName];
             }
-            return newUsage;
           });
-
-          setTrackingSeconds(s => s + Math.floor(elapsedMs / 1000));
+          if (Object.keys(mapped).length > 0) {
+            setUsage(prev => {
+              const merged = { ...prev, ...mapped };
+              saveAppUsage(merged);
+              return merged;
+            });
+          }
         }
+      } catch (e) {}
+    }, 5000);
+
+    return () => clearInterval(pollRef.current);
+  }, []);
+
+  // ─── Re-check when app comes to foreground ───────────────────────────────
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        try {
+          const nativeUsage = await getNativeUsageData();
+          if (nativeUsage && Object.keys(nativeUsage).length > 0) {
+            const mapped = {};
+            appsRef.current.forEach(app => {
+              if (app.packageName && nativeUsage[app.packageName] !== undefined) {
+                mapped[app.id] = nativeUsage[app.packageName];
+              }
+            });
+            if (Object.keys(mapped).length > 0) {
+              setUsage(prev => {
+                const merged = { ...prev, ...mapped };
+                saveAppUsage(merged);
+                return merged;
+              });
+            }
+          }
+          const savedXP = await loadXP();
+          setXp(savedXP);
+        } catch (e) {}
       }
     });
     return () => sub.remove();
-  }, []); // intentionally empty — uses refs
+  }, []);
 
-  // ─── Foreground interval ───────────────────────────────────────────────────
-  const _startInterval = (appId) => {
-    clearInterval(trackingRef.current);
-    trackingRef.current = setInterval(() => {
-      setTrackingSeconds(s => s + 1);
-      setUsage(prev => {
-        const newUsage = { ...prev, [appId]: (prev[appId] || 0) + (1 / 60) };
-        const app = appsRef.current.find(a => a.id === appId);
-        const offset = newUsage[`${appId}_offset`] || 0;
-        const effectiveLimit = app ? app.limit + offset : 0;
-        if (app && newUsage[appId] >= effectiveLimit) {
-          stopTracking();
-          setBlockedApp({ ...app, used: Math.floor(newUsage[appId]) });
-        }
-        return newUsage;
-      });
-    }, 1000);
+  useEffect(() => { if (!loading) saveAppLimits(apps); }, [apps]);
+
+  const pushToNative = (appList, usageData) => {
+    const limits = {};
+    appList.forEach(app => {
+      limits[app.id] = app.limit + (usageData[app.id + '_offset'] || 0);
+    });
+    updateBlocklist(appList, usageData, limits).catch(() => {});
   };
-
-  useEffect(() => {
-    if (trackingApp) {
-      _startInterval(trackingApp);
-    } else {
-      clearInterval(trackingRef.current);
-    }
-    return () => clearInterval(trackingRef.current);
-  }, [trackingApp]);
 
   const getUsedMinutes = (appId) => usage[appId] || 0;
   const getOffset = (appId) => usage[`${appId}_offset`] || 0;
   const getEffectiveLimit = (app) => app.limit + getOffset(app.id);
 
-  const startTracking = (app) => {
-    const usedMin = getUsedMinutes(app.id);
-    const effectiveLimit = getEffectiveLimit(app);
-    if (usedMin >= effectiveLimit) {
-      setBlockedApp({ ...app, used: Math.floor(usedMin) });
-      return;
-    }
-    setTrackingApp(app.id);
-    setTrackingSeconds(0);
+  const toggleApp = (id) => {
+    const updated = apps.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a);
+    setApps(updated);
+    pushToNative(updated, usage);
   };
-
-  const stopTracking = () => {
-    setTrackingApp(null);
-    clearInterval(trackingRef.current);
-    backgroundStartRef.current = null;
-  };
-
-  const toggleApp = (id) => setApps(prev => prev.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
 
   const openEdit = (app) => {
     const usedMin = getUsedMinutes(app.id);
@@ -209,17 +162,17 @@ export default function AppLimitsScreen() {
 
   const saveLimit = () => {
     const val = parseInt(newLimit);
-    if (!val || val < 1 || val > 600) { Alert.alert('Invalid', 'Enter 1–600 minutes'); return; }
-    setApps(prev => prev.map(a => a.id === editingApp.id ? { ...a, limit: val } : a));
+    if (!val || val < 1 || val > 600) { Alert.alert('Ungültig', '1–600 Minuten'); return; }
+    const updated = apps.map(a => a.id === editingApp.id ? { ...a, limit: val } : a);
+    setApps(updated);
+    pushToNative(updated, usage);
     setShowEditModal(false);
   };
 
-  // ─── Pro / 2x XP toggle ───────────────────────────────────────────────────
   const handleProToggle = async () => {
     if (isPro) {
       await cancelSubscription();
       setIsPro(false);
-      Alert.alert('Pro deaktiviert', '2x XP ist jetzt aus.');
     } else {
       await activateSubscription();
       setIsPro(true);
@@ -232,7 +185,11 @@ export default function AppLimitsScreen() {
   const totalLimit = apps.filter(a => a.enabled).reduce((s, a) => s + getEffectiveLimit(a), 0);
   const blocked = apps.filter(a => a.enabled && getUsedMinutes(a.id) >= getEffectiveLimit(a));
 
-  if (loading) return <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: Colors.textSecondary }}>Loading...</Text></View>;
+  if (loading) return (
+    <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <Text style={{ color: Colors.textSecondary }}>Loading...</Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -244,13 +201,12 @@ export default function AppLimitsScreen() {
           <View style={styles.header}>
             <View>
               <Text style={styles.pageTitle}>App Limits</Text>
-              <Text style={styles.pageSubtitle}>Daily screen time control</Text>
+              <Text style={styles.pageSubtitle}>Automatisches Tracking aktiv 🟢</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               <View style={styles.xpBadge}>
                 <Text style={styles.xpBadgeText}>⚡ {xp} XP</Text>
               </View>
-              {/* ─── 2x XP Pro Badge ─── */}
               <TouchableOpacity onPress={handleProToggle} style={[styles.proBadge, isPro && styles.proBadgeActive]}>
                 <Text style={[styles.proBadgeText, isPro && styles.proBadgeTextActive]}>
                   {isPro ? '⭐ 2x XP AN' : '⭐ 2x XP'}
@@ -264,9 +220,9 @@ export default function AppLimitsScreen() {
         <FadeIn delay={80}>
           <Card style={styles.overviewCard}>
             <LinearGradient colors={['#6C63FF18', '#0000']} style={StyleSheet.absoluteFill} />
-            <Text style={styles.overviewLabel}>Today's Screen Time</Text>
+            <Text style={styles.overviewLabel}>Heutiger Screen Time</Text>
             <Text style={styles.overviewValue}>{minutesToHM(totalUsed)}</Text>
-            <Text style={styles.overviewSub}>of {minutesToHM(totalLimit)} total limit</Text>
+            <Text style={styles.overviewSub}>von {minutesToHM(totalLimit)} gesamt</Text>
             <ProgressBar
               progress={totalLimit > 0 ? Math.min(totalUsed / totalLimit, 1) : 0}
               color={totalUsed / totalLimit > 0.8 ? Colors.danger : totalUsed / totalLimit > 0.6 ? Colors.warning : Colors.accent}
@@ -277,10 +233,10 @@ export default function AppLimitsScreen() {
               {blocked.length > 0 && (
                 <View style={styles.blockedAlert}>
                   <Ionicons name="lock-closed" size={12} color={Colors.danger} />
-                  <Text style={styles.blockedAlertText}>{blocked.length} app{blocked.length > 1 ? 's' : ''} blocked</Text>
+                  <Text style={styles.blockedAlertText}>{blocked.length} App{blocked.length > 1 ? 's' : ''} gesperrt</Text>
                 </View>
               )}
-              <Text style={styles.resetNote}>⏰ Resets at midnight</Text>
+              <Text style={styles.resetNote}>⏰ Reset um Mitternacht</Text>
             </View>
           </Card>
         </FadeIn>
@@ -291,60 +247,25 @@ export default function AppLimitsScreen() {
             <View style={styles.xpInfoRow}>
               <Text style={{ fontSize: 20 }}>⚡</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.xpInfoTitle}>Extend with XP</Text>
-                <Text style={styles.xpInfoSub}>Spend 60 XP to unlock +30 min for any app · You have {xp} XP</Text>
+                <Text style={styles.xpInfoTitle}>Mit XP verlängern</Text>
+                <Text style={styles.xpInfoSub}>60 XP = +30 Minuten für eine App · Du hast {xp} XP</Text>
               </View>
             </View>
           </Card>
         </FadeIn>
-
-        {/* ─── Auto-Tracking Hint ─── */}
-        <FadeIn delay={130}>
-          <Card style={styles.xpInfoCard}>
-            <View style={styles.xpInfoRow}>
-              <Text style={{ fontSize: 20 }}>📱</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.xpInfoTitle}>Auto-Tracking</Text>
-                <Text style={styles.xpInfoSub}>
-                  Tippe ▶ bei einer App um das Tracking zu starten. Die Zeit läuft auch im Hintergrund weiter — egal ob du in TikTok oder einer anderen App bist.
-                </Text>
-              </View>
-            </View>
-          </Card>
-        </FadeIn>
-
-        {/* Active tracking */}
-        {trackingApp && (
-          <FadeIn delay={0}>
-            <Card style={styles.trackingCard}>
-              <LinearGradient colors={[Colors.success + '22', '#0000']} style={StyleSheet.absoluteFill} />
-              <View style={styles.trackingRow}>
-                <View style={styles.trackingDot} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.trackingLabel}>Tracking (auch im Hintergrund)</Text>
-                  <Text style={styles.trackingApp}>{apps.find(a => a.id === trackingApp)?.name}</Text>
-                </View>
-                <Text style={styles.trackingTime}>{Math.floor(trackingSeconds / 60)}:{String(trackingSeconds % 60).padStart(2, '0')}</Text>
-                <TouchableOpacity style={styles.stopBtn} onPress={stopTracking}>
-                  <Ionicons name="stop" size={18} color={Colors.danger} />
-                </TouchableOpacity>
-              </View>
-            </Card>
-          </FadeIn>
-        )}
 
         {/* Filter */}
         <FadeIn delay={140}>
           <View style={styles.filterRow}>
             {['all', 'social', 'entertainment'].map(f => (
               <TouchableOpacity key={f} style={[styles.filterTab, filter === f && styles.filterTabActive]} onPress={() => setFilter(f)}>
-                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f === 'all' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </FadeIn>
 
-        <SectionHeader title="Apps" subtitle="▶ track · limit to edit" />
+        <SectionHeader title="Apps" subtitle="Limit tippen zum Bearbeiten" />
 
         {filteredApps.map((app, i) => {
           const usedMin = getUsedMinutes(app.id);
@@ -352,35 +273,25 @@ export default function AppLimitsScreen() {
           const offset = getOffset(app.id);
           const pct = Math.min(usedMin / effectiveLimit, 1);
           const isBlocked = usedMin >= effectiveLimit && app.enabled;
-          const isTracking = trackingApp === app.id;
           const barColor = isBlocked ? Colors.danger : pct > 0.7 ? Colors.warning : app.color;
 
           return (
             <FadeIn key={app.id} delay={200 + i * 50}>
-              <Card style={[styles.appCard, isBlocked && styles.appCardBlocked, isTracking && styles.appCardTracking]}>
+              <Card style={[styles.appCard, isBlocked && styles.appCardBlocked]}>
                 <View style={styles.appRow}>
-                  <TouchableOpacity
-                    style={[styles.appIcon, { backgroundColor: app.color + '22' }]}
-                    onPress={() => isBlocked ? setBlockedApp({ ...app, used: Math.floor(usedMin) }) : startTracking(app)}
-                  >
+                  <View style={[styles.appIcon, { backgroundColor: app.color + '22' }]}>
                     <Ionicons name={app.icon} size={22} color={app.enabled ? app.color : Colors.textMuted} />
                     {isBlocked && (
                       <View style={styles.lockOverlay}>
                         <Ionicons name="lock-closed" size={10} color={Colors.danger} />
                       </View>
                     )}
-                    {isTracking && (
-                      <View style={[styles.lockOverlay, { backgroundColor: Colors.success + '33', borderColor: Colors.success }]}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success }} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  </View>
 
                   <View style={{ flex: 1 }}>
                     <View style={styles.appNameRow}>
                       <Text style={[styles.appName, !app.enabled && { color: Colors.textMuted }]}>{app.name}</Text>
-                      {isBlocked && <View style={styles.blockedTag}><Text style={styles.blockedTagText}>BLOCKED</Text></View>}
-                      {isTracking && <View style={[styles.blockedTag, { backgroundColor: Colors.success + '22' }]}><Text style={[styles.blockedTagText, { color: Colors.success }]}>LIVE</Text></View>}
+                      {isBlocked && <View style={styles.blockedTag}><Text style={styles.blockedTagText}>GESPERRT</Text></View>}
                       {offset > 0 && <View style={[styles.blockedTag, { backgroundColor: Colors.warning + '22' }]}><Text style={[styles.blockedTagText, { color: Colors.warning }]}>+{offset}m</Text></View>}
                     </View>
                     <View style={styles.appStats}>
@@ -392,15 +303,6 @@ export default function AppLimitsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-
-                  {app.enabled && !isBlocked && (
-                    <TouchableOpacity
-                      style={[styles.trackBtn, { backgroundColor: isTracking ? Colors.danger + '22' : app.color + '22' }]}
-                      onPress={() => isTracking ? stopTracking() : startTracking(app)}
-                    >
-                      <Ionicons name={isTracking ? 'stop' : 'play'} size={16} color={isTracking ? Colors.danger : app.color} />
-                    </TouchableOpacity>
-                  )}
 
                   <Switch
                     value={app.enabled}
@@ -416,7 +318,7 @@ export default function AppLimitsScreen() {
                   <TouchableOpacity onPress={() => setBlockedApp({ ...app, used: Math.floor(usedMin) })}>
                     <View style={styles.blockedMsg}>
                       <Ionicons name="lock-closed" size={12} color={Colors.danger} />
-                      <Text style={styles.blockedMsgText}>Tap to extend with XP or wait until midnight</Text>
+                      <Text style={styles.blockedMsgText}>Mit XP verlängern oder bis Mitternacht warten</Text>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -441,7 +343,7 @@ export default function AppLimitsScreen() {
                     <Ionicons name={editingApp.icon} size={28} color={editingApp.color} />
                   </View>
                   <Text style={styles.modalTitle}>{editingApp.name}</Text>
-                  <Text style={styles.modalSub}>Current: {minutesToHM(editingApp.limit)} per day</Text>
+                  <Text style={styles.modalSub}>Aktuell: {minutesToHM(editingApp.limit)} pro Tag</Text>
                 </View>
                 <View style={styles.quickRow}>
                   {[15, 30, 45, 60, 90, 120].map(m => (
@@ -451,16 +353,16 @@ export default function AppLimitsScreen() {
                   ))}
                 </View>
                 <View style={styles.inputRow}>
-                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder="Custom..." placeholderTextColor={Colors.textMuted} maxLength={3} />
+                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder="Eigener Wert..." placeholderTextColor={Colors.textMuted} maxLength={3} />
                   <Text style={styles.inputUnit}>min</Text>
                 </View>
                 <TouchableOpacity style={styles.saveBtn} onPress={saveLimit}>
                   <LinearGradient colors={[Colors.accent, '#9C94FF']} style={styles.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Text style={styles.saveBtnText}>Save Limit</Text>
+                    <Text style={styles.saveBtnText}>Limit speichern</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={styles.cancelText}>Abbrechen</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -478,6 +380,7 @@ export default function AppLimitsScreen() {
           const savedXP = await loadXP();
           setUsage(savedUsage);
           setXp(savedXP);
+          pushToNative(apps, savedUsage);
           setBlockedApp(null);
         }}
       />
@@ -509,13 +412,6 @@ const styles = StyleSheet.create({
   xpInfoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   xpInfoTitle: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.textPrimary },
   xpInfoSub: { fontSize: Typography.xs, color: Colors.textSecondary, marginTop: 2 },
-  trackingCard: { marginBottom: Spacing.sm, padding: Spacing.md, overflow: 'hidden' },
-  trackingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  trackingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.success },
-  trackingLabel: { fontSize: Typography.xs, color: Colors.textSecondary },
-  trackingApp: { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.textPrimary },
-  trackingTime: { fontSize: Typography.lg, fontWeight: Typography.heavy, color: Colors.warning },
-  stopBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.danger + '22', alignItems: 'center', justifyContent: 'center' },
   filterRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.base },
   filterTab: { paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border },
   filterTabActive: { backgroundColor: Colors.accentSoft, borderColor: Colors.accent },
@@ -523,7 +419,6 @@ const styles = StyleSheet.create({
   filterTextActive: { color: Colors.accent },
   appCard: { marginBottom: Spacing.sm, padding: Spacing.base },
   appCardBlocked: { borderColor: Colors.danger + '33', backgroundColor: Colors.danger + '06' },
-  appCardTracking: { borderColor: Colors.success + '44' },
   appRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   appIcon: { width: 46, height: 46, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   lockOverlay: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.danger + '44' },
@@ -534,7 +429,6 @@ const styles = StyleSheet.create({
   appStats: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   appUsed: { fontSize: Typography.sm, color: Colors.textSecondary },
   appLimit: { fontSize: Typography.sm, fontWeight: Typography.medium },
-  trackBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   blockedMsg: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: Spacing.sm },
   blockedMsgText: { fontSize: Typography.xs, color: Colors.danger },
   modalOverlay: { flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end' },
