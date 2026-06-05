@@ -17,7 +17,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false
     },
@@ -30,11 +32,15 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+<<<<<<< HEAD
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_SPECIAL_USE",
         "SYSTEM_ALERT_WINDOW",
         "PACKAGE_USAGE_STATS",
         "RECEIVE_BOOT_COMPLETED"
+=======
+        "FOREGROUND_SERVICE"
+>>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
       ]
     },
     "plugins": [
@@ -43,10 +49,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "FlowOS needs location to track your runs."
         }
+<<<<<<< HEAD
       ],
       [
         "./modules/app-blocker/plugin",
         {}
+=======
+>>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
       ]
     ]
   }

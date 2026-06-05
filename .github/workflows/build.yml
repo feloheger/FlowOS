@@ -1,10 +1,8 @@
 name: Build APK
-
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     name: Build Android APK
@@ -12,11 +10,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+<<<<<<< HEAD
 
       - name: Install EAS CLI manually
         run: npm install -g eas-cli
@@ -24,6 +22,12 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+=======
+      - name: Install EAS CLI manually
+        run: npm install -g eas-cli
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+>>>>>>> 75fdcbacf3ae96eb7e6a7c7332d4acf11abed0b3
       - name: Build APK
         run: EAS_NO_VCS=1 eas build --platform android --profile preview --non-interactive
         env:
