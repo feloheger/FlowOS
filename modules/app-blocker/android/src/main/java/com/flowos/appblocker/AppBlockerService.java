@@ -32,16 +32,22 @@ public class AppBlockerService extends Service {
 
     static final String CHANNEL_ID = "flowos_blocker";
     static final int NOTIF_ID = 1001;
+
+    // SharedPreferences keys
     static final String PREFS_BLOCKLIST = "flowos_blocklist";
+    static final String PREFS_USAGE = "flowos_usage";
     static final String PREFS_BLOCKED_KEY = "_blocked";
     static final String PREFS_NAME_KEY = "_name";
-    static final String PREFS_COLOR_KEY = "_color";
+    static final String PREFS_LIMIT_KEY = "_limit"; // limit in minutes
+    static final String PREFS_LAST_RESET = "last_reset_day";
 
     private Handler handler;
     private Runnable checkRunnable;
     private WindowManager windowManager;
     private android.view.View overlayView;
     private String currentOverlayApp = null;
+    private String lastForegroundApp = null;
+    private long appOpenedAt = 0; // timestamp when current app was opened
 
     @Override
     public void onCreate() {
@@ -62,6 +68,7 @@ public class AppBlockerService extends Service {
             .build();
 
         startForeground(NOTIF_ID, notification);
+        resetDailyUsageIfNeeded();
         startMonitoring();
         return START_STICKY;
     }
@@ -70,8 +77,9 @@ public class AppBlockerService extends Service {
         checkRunnable = new Runnable() {
             @Override
             public void run() {
+                resetDailyUsageIfNeeded();
                 checkForegroundApp();
-                handler.postDelayed(this, 1000);
+                handler.postDelayed(this, 1000); // every second
             }
         };
         handler.post(checkRunnable);
@@ -81,26 +89,65 @@ public class AppBlockerService extends Service {
         String foregroundPkg = getForegroundApp();
         if (foregroundPkg == null) return;
 
-        // If FlowOS itself is open, hide overlay
+        // Skip FlowOS itself
         if (foregroundPkg.equals(getPackageName())) {
             if (overlayView != null) removeOverlay();
             currentOverlayApp = null;
+            flushCurrentAppTime(); // save time before FlowOS takes over
+            lastForegroundApp = null;
             return;
         }
 
-        SharedPreferences prefs = getSharedPreferences(PREFS_BLOCKLIST, Context.MODE_PRIVATE);
-        boolean isBlocked = prefs.getBoolean(foregroundPkg + PREFS_BLOCKED_KEY, false);
+        // App switched → save time for previous app
+        if (!foregroundPkg.equals(lastForegroundApp)) {
+            flushCurrentAppTime();
+            lastForegroundApp = foregroundPkg;
+            appOpenedAt = System.currentTimeMillis();
+        }
 
-        if (isBlocked) {
-            if (!foregroundPkg.equals(currentOverlayApp)) {
-                currentOverlayApp = foregroundPkg;
-                String appName = prefs.getString(foregroundPkg + PREFS_NAME_KEY, foregroundPkg);
-                showOverlay(foregroundPkg, appName);
+        // Add 1 second to this app's usage
+        SharedPreferences blockPrefs = getSharedPreferences(PREFS_BLOCKLIST, Context.MODE_PRIVATE);
+        boolean isTracked = blockPrefs.contains(foregroundPkg + PREFS_LIMIT_KEY);
+
+        if (isTracked) {
+            // Accumulate usage in seconds
+            SharedPreferences usagePrefs = getSharedPreferences(PREFS_USAGE, Context.MODE_PRIVATE);
+            float usedSeconds = usagePrefs.getFloat(foregroundPkg + "_seconds", 0f);
+            usedSeconds += 1f;
+            usagePrefs.edit().putFloat(foregroundPkg + "_seconds", usedSeconds).apply();
+
+            float usedMinutes = usedSeconds / 60f;
+            float limitMinutes = blockPrefs.getFloat(foregroundPkg + PREFS_LIMIT_KEY, 9999f);
+            boolean isBlocked = usedMinutes >= limitMinutes;
+
+            // Update blocked status
+            blockPrefs.edit().putBoolean(foregroundPkg + PREFS_BLOCKED_KEY, isBlocked).apply();
+
+            if (isBlocked) {
+                if (!foregroundPkg.equals(currentOverlayApp)) {
+                    currentOverlayApp = foregroundPkg;
+                    String appName = blockPrefs.getString(foregroundPkg + PREFS_NAME_KEY, foregroundPkg);
+                    showOverlay(foregroundPkg, appName, Math.floor(usedMinutes), limitMinutes);
+                }
+            } else {
+                if (overlayView != null && foregroundPkg.equals(currentOverlayApp)) {
+                    removeOverlay();
+                    currentOverlayApp = null;
+                }
             }
         } else {
-            if (overlayView != null) removeOverlay();
-            currentOverlayApp = null;
+            // App not in our list — hide overlay if showing
+            if (overlayView != null) {
+                removeOverlay();
+                currentOverlayApp = null;
+            }
         }
+    }
+
+    private void flushCurrentAppTime() {
+        // Nothing to flush if no app was tracked
+        lastForegroundApp = null;
+        appOpenedAt = 0;
     }
 
     private String getForegroundApp() {
@@ -123,37 +170,57 @@ public class AppBlockerService extends Service {
         }
     }
 
-    private void showOverlay(String pkg, String appName) {
+    // Reset daily usage at midnight
+    private void resetDailyUsageIfNeeded() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_BLOCKLIST, Context.MODE_PRIVATE);
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        int today = cal.get(java.util.Calendar.DAY_OF_YEAR) * 10000 + cal.get(java.util.Calendar.YEAR);
+        int lastReset = prefs.getInt(PREFS_LAST_RESET, 0);
+
+        if (today != lastReset) {
+            // New day — clear all usage
+            getSharedPreferences(PREFS_USAGE, Context.MODE_PRIVATE).edit().clear().apply();
+            // Reset blocked status for all apps
+            SharedPreferences.Editor editor = prefs.edit();
+            for (String key : prefs.getAll().keySet()) {
+                if (key.endsWith(PREFS_BLOCKED_KEY)) {
+                    editor.putBoolean(key, false);
+                }
+            }
+            editor.putInt(PREFS_LAST_RESET, today);
+            editor.apply();
+        }
+    }
+
+    private void showOverlay(String pkg, String appName, double usedMin, float limitMin) {
         if (!Settings.canDrawOverlays(this)) return;
         removeOverlay();
 
-        // Root: full-screen dark overlay
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xF2000000);
 
-        // Card
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setBackgroundColor(0xFF1A1A2E);
         card.setPadding(dp(32), dp(40), dp(32), dp(40));
 
-        FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
-            dp(320), LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+        FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(dp(320), LinearLayout.LayoutParams.WRAP_CONTENT);
         cardParams.gravity = Gravity.CENTER;
         root.addView(card, cardParams);
 
-        // 🔒
-        addTextView(card, "🔒", 52, 0xFF_FF4444, dp(0), dp(0));
-        // Title
-        addTextView(card, "Limit erreicht", 26, 0xFFFF4444, dp(16), dp(4));
-        // App name
-        addTextView(card, appName, 20, 0xFFFFFFFF, dp(8), dp(0));
-        // Message
-        addTextView(card, "Dein tägliches Limit für " + appName + " ist vorbei.\nKomm morgen wieder! 🌙", 13, 0xFFAAAAAA, dp(16), dp(32));
+        addTextView(card, "🔒", 52, 0xFFFF4444, 0, dp(4));
+        addTextView(card, "Limit erreicht", 26, 0xFFFF4444, dp(12), dp(4));
+        addTextView(card, appName, 20, 0xFFFFFFFF, dp(8), dp(4));
+        addTextView(card,
+            (int)usedMin + " / " + (int)limitMin + " Minuten benutzt",
+            13, 0xFF888899, dp(4), dp(24)
+        );
+        addTextView(card,
+            "Dein tägliches Limit für " + appName + " ist vorbei.\nKomm morgen wieder! 🌙",
+            13, 0xFFAAAAAA, 0, dp(32)
+        );
 
-        // Button: Zu FlowOS
         Button btn = new Button(this);
         btn.setText("⚡ In FlowOS öffnen");
         btn.setTextColor(0xFFFFFFFF);
@@ -172,10 +239,8 @@ public class AppBlockerService extends Service {
         btnParams.setMargins(0, 0, 0, dp(12));
         card.addView(btn, btnParams);
 
-        // Sub-text
-        addTextView(card, "⏰ Limit wird um Mitternacht zurückgesetzt", 11, 0xFF666680, dp(0), dp(0));
+        addTextView(card, "⏰ Limit wird um Mitternacht zurückgesetzt", 11, 0xFF666680, 0, 0);
 
-        // Window params
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -201,8 +266,7 @@ public class AppBlockerService extends Service {
         tv.setGravity(Gravity.CENTER);
         tv.setLineSpacing(4, 1);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
         );
         p.setMargins(0, topMargin, 0, bottomMargin);
         p.gravity = Gravity.CENTER_HORIZONTAL;
