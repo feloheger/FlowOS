@@ -76,7 +76,7 @@ export async function updateBlocklist(apps, usage, limits) {
     .filter(app => app.enabled)
     .map(app => {
       const pkgName = app.packageName || APP_PACKAGE_NAMES[app.id];
-      if (!pkgName) return null; // skip unknown apps
+      if (!pkgName) return null;
 
       const usedMin = usage[app.id] || 0;
       const limitMin = limits[app.id] || app.limit;
@@ -86,11 +86,22 @@ export async function updateBlocklist(apps, usage, limits) {
         packageName: pkgName,
         name: app.name,
         blocked: isBlocked,
+        limitMinutes: limitMin, // ← send limit so native service can track
       };
     })
     .filter(Boolean);
 
   return AppBlocker.updateBlocklist(blocklist);
+}
+
+// Read usage data tracked natively (in minutes)
+export async function getNativeUsageData() {
+  if (!checkPlatform()) return {};
+  try {
+    return await AppBlocker.getUsageData();
+  } catch (e) {
+    return {};
+  }
 }
 
 // Convenience: check all permissions and start if OK
