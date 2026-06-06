@@ -1,7 +1,7 @@
 # FlowOS – Your Personal Life OS
 
 A complete personal management app with:
-- 📊 **Dashboard** – Daily energy, tasks, project overview
+- 📊 **Dashboard** – Daily energy, tasks, project overview 
 - 📁 **Projects** – Full project management with budgets & tasks
 - 🔥 **Habits** – Duolingo-style habit tracking with XP & streaks
 - 🔒 **App Limits** – Daily screen time limits that block apps at midnight
