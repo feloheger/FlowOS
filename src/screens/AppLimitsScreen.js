@@ -92,7 +92,7 @@ export default function AppLimitsScreen() {
           }
         }
       } catch (e) {}
-    }, 5000);
+    }, 2000);
 
     return () => clearInterval(pollRef.current);
   }, []);
@@ -151,7 +151,8 @@ export default function AppLimitsScreen() {
   const openEdit = (app) => {
     const usedMin = getUsedMinutes(app.id);
     const effectiveLimit = getEffectiveLimit(app);
-    if (usedMin >= effectiveLimit) {
+    // Block editing if limit is reached OR if app is in blocked state
+    if (usedMin >= effectiveLimit || usedMin >= app.limit) {
       Alert.alert(
         'Limit gesperrt 🔒',
         'Du kannst das Limit nicht erhöhen während es erreicht ist. Verwende XP um Zeit zu verlängern, oder warte bis Mitternacht.',
@@ -312,7 +313,7 @@ export default function AppLimitsScreen() {
                       <Text style={styles.appUsed}>{minutesToHM(usedMin)}</Text>
                       <TouchableOpacity onPress={() => openEdit(app)}>
                         <Text style={[styles.appLimit, { color: isBlocked ? Colors.danger : Colors.accent }]}>
-                          / {minutesToHM(effectiveLimit)} ✎
+                          / {minutesToHM(effectiveLimit)} {isBlocked ? '🔒' : '✎'}
                         </Text>
                       </TouchableOpacity>
                     </View>
