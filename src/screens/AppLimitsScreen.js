@@ -370,7 +370,7 @@ export default function AppLimitsScreen() {
                   ))}
                 </View>
                 <View style={styles.inputRow}>
-                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder=t.customLimit placeholderTextColor={Colors.textMuted} maxLength={3} />
+                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder={t.customLimit} placeholderTextColor={Colors.textMuted} maxLength={3} />
                   <Text style={styles.inputUnit}>min</Text>
                 </View>
                 <TouchableOpacity style={styles.saveBtn} onPress={saveLimit}>
