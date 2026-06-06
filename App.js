@@ -6,15 +6,23 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AppProvider, useAppContext } from './src/AppContext';
 
-function AppInner() { 
+function AppInner() {
   const { colors, themeId } = useAppContext();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: 1, duration: 600, useNativeDriver: true,
+      toValue: 1, duration: 400, useNativeDriver: true,
     }).start();
   }, []);
+
+  // Re-animate when theme changes
+  useEffect(() => {
+    fadeAnim.setValue(0.7);
+    Animated.timing(fadeAnim, {
+      toValue: 1, duration: 300, useNativeDriver: true,
+    }).start();
+  }, [themeId]);
 
   return (
     <>
