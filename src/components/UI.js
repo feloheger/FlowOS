@@ -7,10 +7,13 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useAppContext } from '../AppContext';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 
 // ─── Card ───────────────────────────────────────────────────────────────────
 export function Card({ children, style, onPress }) {
+  const ctx = useAppContext();
+  const c = ctx?.colors;
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -29,7 +32,7 @@ export function Card({ children, style, onPress }) {
       </TouchableOpacity>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={[styles.card, { backgroundColor: c?.bgCard || Colors.bgCard, borderColor: c?.border || Colors.border }, style]}>{children}</View>;
 }
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
@@ -86,8 +89,8 @@ export function SectionHeader({ title, subtitle, action, onAction }) {
   return (
     <View style={styles.sectionHeader}>
       <View>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+        <Text style={[styles.sectionTitle, { color: c?.textSecondary || Colors.textSecondary }]}>{title}</Text>
+        {subtitle ? <Text style={[styles.sectionSubtitle, { color: c?.textMuted || Colors.textMuted }]}>{subtitle}</Text> : null}
       </View>
       {action ? (
         <TouchableOpacity onPress={onAction}>
