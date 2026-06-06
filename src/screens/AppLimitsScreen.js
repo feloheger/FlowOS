@@ -33,7 +33,7 @@ function minutesToHM(min) {
 }
 
 export default function AppLimitsScreen() {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   const [apps, setApps] = useState([]);
   const [usage, setUsage] = useState({});
   const [xp, setXp] = useState(0);
@@ -193,7 +193,7 @@ export default function AppLimitsScreen() {
   const blocked = apps.filter(a => a.enabled && getUsedMinutes(a.id) >= getEffectiveLimit(a));
 
   if (loading) return (
-    <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+    <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors?.bg || Colors.bg }]}>
       <Text style={{ color: Colors.textSecondary }}>{t.loading}</Text>
     </View>
   );

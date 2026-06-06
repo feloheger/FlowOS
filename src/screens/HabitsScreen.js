@@ -98,7 +98,7 @@ function calcDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function HabitsScreen() {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -344,7 +344,7 @@ export default function HabitsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors?.bg || Colors.bg }]}>
         <Text style={{ color: Colors.textSecondary }}>{t.loading}</Text>
       </View>
     );

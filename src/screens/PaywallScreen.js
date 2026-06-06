@@ -19,7 +19,7 @@ const FEATURES = [
 ];
 
 export default function PaywallScreen({ visible, onClose, onActivate }) {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -114,9 +114,9 @@ export default function PaywallScreen({ visible, onClose, onActivate }) {
 
 // Locked screen shown when tapping a Pro tab without subscription
 export function LockedScreen({ tabName, onUnlock }) {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   return (
-    <View style={styles.lockedContainer}>
+    <View style={[styles.lockedContainer, { backgroundColor: colors?.bg || Colors.bg }]}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} />
       <View style={styles.lockedContent}>
         <View style={styles.lockedIcon}>

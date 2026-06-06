@@ -34,7 +34,7 @@ const UNITS = [
 ];
 
 export default function SettingsScreen() {
-  const { themeId, setTheme: setGlobalTheme, language: globalLang, setLang: setGlobalLang } = useAppContext();
+  const { themeId, setTheme: setGlobalTheme, language: globalLang, setLang: setGlobalLang , colors } = useAppContext();
   const [language, setLanguage] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [units, setUnits] = useState('metric');

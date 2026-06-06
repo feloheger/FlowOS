@@ -11,7 +11,7 @@ import { Card, ProgressBar, FadeIn, SectionHeader } from '../components/UI';
 import { initialGoals, initialProjects } from '../data/initialData';
 
 export default function GoalsScreen() {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   const [goals] = useState(initialGoals);
 
   return (

@@ -10,7 +10,7 @@ import { extendAppLimit, loadXP } from '../data/storage';
 import { useAppContext } from '../AppContext';
 
 export default function AppBlockedScreen({ visible, app, onClose, onExtended }) {
-  const { t } = useAppContext();
+  const { t , colors } = useAppContext();
   const [xp, setXp] = useState(0);
   const [extending, setExtending] = useState(false);
   const [extendResult, setExtendResult] = useState(null);
@@ -56,7 +56,7 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
     <Modal transparent visible={visible} animationType="none">
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
         <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
-          <LinearGradient colors={['#1A1A2E', '#13131A']} style={StyleSheet.absoluteFill} borderRadius={Radius.xxl} />
+          <LinearGradient colors={[colors?.bgElevated || '#1A1A2E', colors?.bgCard || '#13131A']} style={StyleSheet.absoluteFill} borderRadius={Radius.xxl} />
           <LinearGradient
             colors={[Colors.danger + '33', Colors.danger + '00']}
             style={styles.topGlow}
