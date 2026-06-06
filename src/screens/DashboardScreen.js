@@ -5,10 +5,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../AppContext';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, ProgressBar, FadeIn, SectionHeader, EnergyDot } from '../components/UI';
 
 export default function DashboardScreen({ navigation }) {
+  const { t, colors } = useAppContext();
   const [energy, setEnergy] = useState(3);
   const [tasks, setTasks] = useState([]);
   const [now, setNow] = useState(new Date());
@@ -41,7 +43,7 @@ export default function DashboardScreen({ navigation }) {
   const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors?.bg || Colors.bg }]}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.4 }} />
 
       <Animated.ScrollView
@@ -55,7 +57,7 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.name}>Welcome 👋</Text>
+              <Text style={styles.name}>{t.welcome}</Text>
             </View>
             <TouchableOpacity style={styles.notifBtn}>
               <Ionicons name="notifications-outline" size={22} color={Colors.textSecondary} />
@@ -79,7 +81,7 @@ export default function DashboardScreen({ navigation }) {
         <FadeIn delay={120}>
           <Card style={styles.energyCard}>
             <LinearGradient colors={['#6C63FF18', '#6C63FF05']} style={StyleSheet.absoluteFill} />
-            <Text style={styles.energyLabel}>Today's Energy</Text>
+            <Text style={styles.energyLabel}>{t.todayEnergy}</Text>
             <View style={styles.energyDots}>
               {[1, 2, 3, 4, 5].map(i => (
                 <TouchableOpacity key={i} onPress={() => setEnergy(i)}>
@@ -164,7 +166,7 @@ function EmptyState({ icon, text, sub }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
   scrollContent: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
   greeting: { fontSize: Typography.sm, color: Colors.textSecondary, letterSpacing: 0.3 },

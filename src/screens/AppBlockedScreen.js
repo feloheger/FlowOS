@@ -7,8 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { extendAppLimit, loadXP } from '../data/storage';
+import { useAppContext } from '../AppContext';
 
 export default function AppBlockedScreen({ visible, app, onClose, onExtended }) {
+  const { t } = useAppContext();
   const [xp, setXp] = useState(0);
   const [extending, setExtending] = useState(false);
   const [extendResult, setExtendResult] = useState(null);
@@ -74,7 +76,7 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
             </View>
           )}
 
-          <Text style={styles.title}>Limit Reached</Text>
+          <Text style={styles.title}>{t.limitReached}</Text>
           <Text style={styles.appName}>{app.name}</Text>
           <Text style={styles.message}>
             Du hast dein tägliches Limit für {app.name} erreicht.{'\n'}
@@ -85,23 +87,23 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>{app.used}m</Text>
-              <Text style={styles.statLabel}>Used today</Text>
+              <Text style={styles.statLabel}>{t.usedToday}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
               <Text style={styles.statValue}>{app.limit}m</Text>
-              <Text style={styles.statLabel}>Daily limit</Text>
+              <Text style={styles.statLabel}>{t.dailyLimit}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
               <Text style={[styles.statValue, { color: Colors.warning }]}>{xp}</Text>
-              <Text style={styles.statLabel}>Your XP</Text>
+              <Text style={styles.statLabel}>{t.yourXP}</Text>
             </View>
           </View>
 
           {/* Extend with XP */}
           <View style={styles.extendSection}>
-            <Text style={styles.extendTitle}>Extend with XP</Text>
+            <Text style={styles.extendTitle}>{t.extendWithXP}</Text>
             <Text style={styles.extendDesc}>
               Spend <Text style={{ color: Colors.warning, fontWeight: Typography.bold }}>{EXTEND_COST} XP</Text> to unlock {EXTEND_MINUTES} more minutes
             </Text>
@@ -110,8 +112,7 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
               <View style={styles.errorBox}>
                 <Ionicons name="warning" size={14} color={Colors.danger} />
                 <Text style={styles.errorText}>
-                  Not enough XP! You have {extendResult.currentXP} XP, need {extendResult.cost} XP.{'\n'}
-                  Complete habits to earn more XP 💪
+                  {t.notEnoughXPMsg}
                 </Text>
               </View>
             )}
@@ -135,7 +136,7 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
               >
                 <Text style={styles.extendCost}>⚡ {EXTEND_COST} XP</Text>
                 <Text style={[styles.extendBtnText, !canExtend && { color: Colors.textMuted }]}>
-                  {extending ? 'Extending...' : `+${EXTEND_MINUTES} min`}
+                  {extending ? t.extending : `+${EXTEND_MINUTES} min`}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -152,7 +153,7 @@ export default function AppBlockedScreen({ visible, app, onClose, onExtended }) 
             <Text style={styles.closeText}>Close</Text>
           </TouchableOpacity>
 
-          <Text style={styles.resetNote}>⏰ Limit resets at midnight</Text>
+          <Text style={styles.resetNote}>{t.resetMidnight}</Text>
         </Animated.View>
       </Animated.View>
     </Modal>

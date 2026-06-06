@@ -5,15 +5,17 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../AppContext';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, ProgressBar, FadeIn, SectionHeader } from '../components/UI';
 import { initialGoals, initialProjects } from '../data/initialData';
 
 export default function GoalsScreen() {
+  const { t } = useAppContext();
   const [goals] = useState(initialGoals);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors?.bg || Colors.bg }]}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
@@ -21,7 +23,7 @@ export default function GoalsScreen() {
           <View style={styles.header}>
             <View>
               <Text style={styles.pageTitle}>Vision</Text>
-              <Text style={styles.pageSubtitle}>Your 2024 goals</Text>
+              <Text style={styles.pageSubtitle}>{t.yourGoals}</Text>
             </View>
             <TouchableOpacity style={styles.addBtn}>
               <Ionicons name="add" size={22} color="#fff" />
@@ -78,7 +80,7 @@ export default function GoalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
   content: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
   pageTitle: { fontSize: Typography.xxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -0.5 },

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../AppContext';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { activateSubscription, cancelSubscription } from '../data/storage';
 
@@ -18,6 +19,7 @@ const FEATURES = [
 ];
 
 export default function PaywallScreen({ visible, onClose, onActivate }) {
+  const { t } = useAppContext();
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -67,8 +69,8 @@ export default function PaywallScreen({ visible, onClose, onActivate }) {
             </LinearGradient>
           </View>
 
-          <Text style={styles.title}>FlowOS Pro</Text>
-          <Text style={styles.subtitle}>Unlock your full potential</Text>
+          <Text style={styles.title}>{t.proTitle}</Text>
+          <Text style={styles.subtitle}>{t.proDesc}</Text>
 
           {/* Features */}
           <View style={styles.features}>
@@ -91,7 +93,7 @@ export default function PaywallScreen({ visible, onClose, onActivate }) {
           {/* CTA */}
           <TouchableOpacity style={styles.ctaBtn} onPress={handleActivate}>
             <LinearGradient colors={[Colors.accent, '#9C94FF']} style={styles.ctaGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.ctaText}>Start Free 7-Day Trial</Text>
+              <Text style={styles.ctaText}>{t.startTrial}</Text>
               <Ionicons name="arrow-forward" size={20} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
@@ -112,6 +114,7 @@ export default function PaywallScreen({ visible, onClose, onActivate }) {
 
 // Locked screen shown when tapping a Pro tab without subscription
 export function LockedScreen({ tabName, onUnlock }) {
+  const { t } = useAppContext();
   return (
     <View style={styles.lockedContainer}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} />
@@ -122,7 +125,7 @@ export function LockedScreen({ tabName, onUnlock }) {
           </LinearGradient>
         </View>
         <Text style={styles.lockedTitle}>{tabName}</Text>
-        <Text style={styles.lockedSub}>This feature is part of FlowOS Pro</Text>
+        <Text style={styles.lockedSub}>{t.proFeature}</Text>
         <View style={styles.lockedFeatures}>
           {FEATURES.slice(0, 3).map((f, i) => (
             <View key={i} style={styles.lockedFeatureRow}>
@@ -133,7 +136,7 @@ export function LockedScreen({ tabName, onUnlock }) {
         </View>
         <TouchableOpacity style={styles.unlockBtn} onPress={onUnlock}>
           <LinearGradient colors={[Colors.accent, '#9C94FF']} style={styles.unlockGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.unlockText}>Unlock with FlowOS Pro</Text>
+            <Text style={styles.unlockText}>{t.unlockPro}</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
   testBtnText: { fontSize: Typography.xs, color: Colors.textSecondary },
 
   // Locked screen
-  lockedContainer: { flex: 1, backgroundColor: Colors.bg },
+  lockedContainer: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
   lockedContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },
   lockedIcon: { marginBottom: Spacing.xl },
   lockedIconGrad: { width: 100, height: 100, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },

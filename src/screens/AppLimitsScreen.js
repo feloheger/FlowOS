@@ -12,6 +12,7 @@ import {
   checkAndResetDaily, loadXP, loadSubscription, activateSubscription, cancelSubscription,
 } from '../data/storage';
 import AppBlockedScreen from './AppBlockedScreen';
+import { useAppContext } from '../AppContext';
 import { updateBlocklist, getNativeUsageData } from '../native/AppBlocker';
 
 const DEFAULT_APPS = [
@@ -32,6 +33,7 @@ function minutesToHM(min) {
 }
 
 export default function AppLimitsScreen() {
+  const { t } = useAppContext();
   const [apps, setApps] = useState([]);
   const [usage, setUsage] = useState({});
   const [xp, setXp] = useState(0);
@@ -154,7 +156,7 @@ export default function AppLimitsScreen() {
     // Block editing if limit is reached OR if app is in blocked state
     if (usedMin >= effectiveLimit || usedMin >= app.limit) {
       Alert.alert(
-        'Limit gesperrt 🔒',
+        t.limitLocked,
         'Du kannst das Limit nicht erhöhen während es erreicht ist. Verwende XP um Zeit zu verlängern, oder warte bis Mitternacht.',
         [{ text: 'OK' }]
       );
@@ -192,12 +194,12 @@ export default function AppLimitsScreen() {
 
   if (loading) return (
     <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-      <Text style={{ color: Colors.textSecondary }}>Loading...</Text>
+      <Text style={{ color: Colors.textSecondary }}>{t.loading}</Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors?.bg || Colors.bg }]}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -205,8 +207,8 @@ export default function AppLimitsScreen() {
         <FadeIn delay={0}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.pageTitle}>App Limits</Text>
-              <Text style={styles.pageSubtitle}>Automatisches Tracking aktiv 🟢</Text>
+              <Text style={styles.pageTitle}>{t.appLimits}</Text>
+              <Text style={styles.pageSubtitle}>{t.autoTracking}</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               <View style={styles.xpBadge}>
@@ -225,7 +227,7 @@ export default function AppLimitsScreen() {
         <FadeIn delay={80}>
           <Card style={styles.overviewCard}>
             <LinearGradient colors={['#6C63FF18', '#0000']} style={StyleSheet.absoluteFill} />
-            <Text style={styles.overviewLabel}>Heutiger Screen Time</Text>
+            <Text style={styles.overviewLabel}>{t.todayScreenTime}</Text>
             <Text style={styles.overviewValue}>{minutesToHM(totalUsed)}</Text>
             <Text style={styles.overviewSub}>von {minutesToHM(totalLimit)} gesamt</Text>
             <ProgressBar
@@ -262,7 +264,7 @@ export default function AppLimitsScreen() {
             <View style={styles.xpInfoRow}>
               <Text style={{ fontSize: 20 }}>⚡</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.xpInfoTitle}>Mit XP verlängern</Text>
+                <Text style={styles.xpInfoTitle}>{t.extendXP}</Text>
                 <Text style={styles.xpInfoSub}>60 XP = +30 Minuten für eine App · Du hast {xp} XP</Text>
               </View>
             </View>
@@ -274,7 +276,7 @@ export default function AppLimitsScreen() {
           <View style={styles.filterRow}>
             {['all', 'social', 'entertainment'].map(f => (
               <TouchableOpacity key={f} style={[styles.filterTab, filter === f && styles.filterTabActive]} onPress={() => setFilter(f)}>
-                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f === 'all' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f === 'all' ? t.all : f.charAt(0).toUpperCase() + f.slice(1)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -306,7 +308,7 @@ export default function AppLimitsScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.appNameRow}>
                       <Text style={[styles.appName, !app.enabled && { color: Colors.textMuted }]}>{app.name}</Text>
-                      {isBlocked && <View style={styles.blockedTag}><Text style={styles.blockedTagText}>GESPERRT</Text></View>}
+                      {isBlocked && <View style={styles.blockedTag}><Text style={styles.blockedTagText}>{t.blocked}</Text></View>}
                       {offset > 0 && <View style={[styles.blockedTag, { backgroundColor: Colors.warning + '22' }]}><Text style={[styles.blockedTagText, { color: Colors.warning }]}>+{offset}m</Text></View>}
                     </View>
                     <View style={styles.appStats}>
@@ -333,7 +335,7 @@ export default function AppLimitsScreen() {
                   <TouchableOpacity onPress={() => setBlockedApp({ ...app, used: Math.floor(usedMin) })}>
                     <View style={styles.blockedMsg}>
                       <Ionicons name="lock-closed" size={12} color={Colors.danger} />
-                      <Text style={styles.blockedMsgText}>Mit XP verlängern oder bis Mitternacht warten</Text>
+                      <Text style={styles.blockedMsgText}>{t.extendOrWait}</Text>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -368,16 +370,16 @@ export default function AppLimitsScreen() {
                   ))}
                 </View>
                 <View style={styles.inputRow}>
-                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder="Eigener Wert..." placeholderTextColor={Colors.textMuted} maxLength={3} />
+                  <TextInput style={styles.limitInput} value={newLimit} onChangeText={setNewLimit} keyboardType="number-pad" placeholder=t.customLimit placeholderTextColor={Colors.textMuted} maxLength={3} />
                   <Text style={styles.inputUnit}>min</Text>
                 </View>
                 <TouchableOpacity style={styles.saveBtn} onPress={saveLimit}>
                   <LinearGradient colors={[Colors.accent, '#9C94FF']} style={styles.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Text style={styles.saveBtnText}>Limit speichern</Text>
+                    <Text style={styles.saveBtnText}>{t.saveLimit}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
-                  <Text style={styles.cancelText}>Abbrechen</Text>
+                  <Text style={styles.cancelText}>{t.cancel}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -404,7 +406,7 @@ export default function AppLimitsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
   content: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
   pageTitle: { fontSize: Typography.xxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -0.5 },

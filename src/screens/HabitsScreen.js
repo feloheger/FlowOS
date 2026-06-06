@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { Card, FadeIn, ProgressBar } from '../components/UI';
+import { useAppContext } from '../AppContext';
 import { saveHabits, loadHabits, checkAndResetDaily, addXP, loadXP, loadSubscription } from '../data/storage';
 
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -97,6 +98,7 @@ function calcDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function HabitsScreen() {
+  const { t } = useAppContext();
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -343,13 +345,13 @@ export default function HabitsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: Colors.textSecondary }}>Loading...</Text>
+        <Text style={{ color: Colors.textSecondary }}>{t.loading}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors?.bg || Colors.bg }]}>
       <LinearGradient colors={['#12122088', '#0A0A0F']} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 0.3 }} />
 
       <Animated.View pointerEvents="none" style={[styles.celebOverlay, {
@@ -357,7 +359,7 @@ export default function HabitsScreen() {
         transform: [{ scale: celebAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }]
       }]}>
         <Text style={styles.celebEmoji}>🎉</Text>
-        <Text style={styles.celebText}>Habit Complete!</Text>
+        <Text style={styles.celebText}>{t.habitComplete}</Text>
         <Text style={styles.celebXP}>+{verifyingHabit?.lastXP || verifyingHabit?.xp || 0} XP{isPro ? ' (2x!)' : ''}</Text>
       </Animated.View>
 
@@ -398,10 +400,10 @@ export default function HabitsScreen() {
           <FadeIn delay={100}>
             <View style={styles.emptyState}>
               <Text style={{ fontSize: 64 }}>🔥</Text>
-              <Text style={styles.emptyText}>No habits yet</Text>
-              <Text style={styles.emptySub}>Tap + to add your first habit</Text>
+              <Text style={styles.emptyText}>{t.noHabits}</Text>
+              <Text style={styles.emptySub}>{t.tapToAdd}</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowAddModal(true)}>
-                <Text style={styles.emptyBtnText}>Add Habit</Text>
+                <Text style={styles.emptyBtnText}>{t.addHabit}</Text>
               </TouchableOpacity>
             </View>
           </FadeIn>
@@ -432,7 +434,7 @@ export default function HabitsScreen() {
                     </View>
                   ) : (
                     <TouchableOpacity style={[styles.doBtn, { borderColor: habit.color + '66' }]} onPress={() => openVerify(habit)}>
-                      <Text style={[styles.doBtnText, { color: habit.color }]}>Start</Text>
+                      <Text style={[styles.doBtnText, { color: habit.color }]}>{t.start}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -457,7 +459,7 @@ export default function HabitsScreen() {
           <View style={styles.modalSheet}>
             <LinearGradient colors={['#1C1C26', '#13131A']} style={StyleSheet.absoluteFill} />
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Add Habit</Text>
+            <Text style={styles.modalTitle}>{t.addHabit}</Text>
 
             {/* Category filter */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
@@ -556,23 +558,23 @@ export default function HabitsScreen() {
                     {!gpsActive ? (
                       <TouchableOpacity style={[styles.gpsBtn, { backgroundColor: verifyingHabit.color }]} onPress={startGPS}>
                         <Ionicons name="play" size={28} color="#fff" />
-                        <Text style={styles.gpsBtnText}>Start GPS Tracking</Text>
+                        <Text style={styles.gpsBtnText}>{t.startGPS}</Text>
                       </TouchableOpacity>
                     ) : gpsPaused ? (
                       <View style={styles.gpsControls}>
                         <TouchableOpacity style={[styles.gpsBtnSmall, { backgroundColor: Colors.success }]} onPress={resumeGPS}>
                           <Ionicons name="play" size={22} color="#fff" />
-                          <Text style={styles.gpsBtnSmallText}>Resume</Text>
+                          <Text style={styles.gpsBtnSmallText}>{t.resume}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.gpsBtnSmall, { backgroundColor: Colors.danger }]} onPress={stopGPS}>
                           <Ionicons name="stop" size={22} color="#fff" />
-                          <Text style={styles.gpsBtnSmallText}>Stop</Text>
+                          <Text style={styles.gpsBtnSmallText}>{t.stop}</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
                       <TouchableOpacity style={[styles.gpsBtn, { backgroundColor: Colors.warning + '33', borderWidth: 1, borderColor: Colors.warning }]} onPress={pauseGPS}>
                         <Ionicons name="pause" size={28} color={Colors.warning} />
-                        <Text style={[styles.gpsBtnText, { color: Colors.warning }]}>Pause</Text>
+                        <Text style={[styles.gpsBtnText, { color: Colors.warning }]}>{t.pause}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -588,7 +590,7 @@ export default function HabitsScreen() {
                     >
                       <Ionicons name={timerActive ? 'pause' : 'play'} size={24} color={timerActive ? Colors.danger : verifyingHabit.color} />
                       <Text style={[styles.timerBtnText, { color: timerActive ? Colors.danger : verifyingHabit.color }]}>
-                        {timerActive ? 'Pause' : 'Start Timer'}
+                        {timerActive ? t.pause : 'Start Timer'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -615,7 +617,7 @@ export default function HabitsScreen() {
                 {/* LINK */}
                 {verifyingHabit.verifyType === 'link' && (
                   <View style={styles.inputSection}>
-                    <Text style={styles.inputLabel}>Paste your post link</Text>
+                    <Text style={styles.inputLabel}>{t.pasteLink}</Text>
                     <TextInput style={styles.verifyInput} value={verifyInput} onChangeText={setVerifyInput} placeholder="https://..." placeholderTextColor={Colors.textMuted} autoCapitalize="none" />
                   </View>
                 )}
@@ -623,7 +625,7 @@ export default function HabitsScreen() {
                 {/* TEXT */}
                 {verifyingHabit.verifyType === 'text' && (
                   <View style={styles.inputSection}>
-                    <Text style={styles.inputLabel}>Write your entry</Text>
+                    <Text style={styles.inputLabel}>{t.writeEntry}</Text>
                     <TextInput style={[styles.verifyInput, { height: 100 }]} value={verifyInput} onChangeText={setVerifyInput} placeholder="Today I..." placeholderTextColor={Colors.textMuted} multiline />
                   </View>
                 )}
@@ -634,7 +636,7 @@ export default function HabitsScreen() {
                     <View style={[styles.bigCheck, verifyInput === 'done' && { backgroundColor: verifyingHabit.color, borderColor: verifyingHabit.color }]}>
                       {verifyInput === 'done' && <Ionicons name="checkmark" size={32} color="#fff" />}
                     </View>
-                    <Text style={styles.checkboxLabel}>Tap to confirm</Text>
+                    <Text style={styles.checkboxLabel}>{t.tapConfirm}</Text>
                   </TouchableOpacity>
                 )}
 
@@ -666,7 +668,7 @@ export default function HabitsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
   content: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
   pageTitle: { fontSize: Typography.xxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -0.5 },
