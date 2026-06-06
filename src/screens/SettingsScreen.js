@@ -299,7 +299,7 @@ function Divider() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
+  container: { flex: 1, backgroundColor: Colors.bg },
   content: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   pageTitle: { fontSize: Typography.xxl, fontWeight: Typography.heavy, color: Colors.textPrimary, letterSpacing: -0.5, marginBottom: Spacing.xl },
   sectionLabel: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.sm, marginLeft: 4 },

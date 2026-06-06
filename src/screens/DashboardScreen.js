@@ -166,7 +166,7 @@ function EmptyState({ icon, text, sub }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
+  container: { flex: 1, backgroundColor: Colors.bg },
   scrollContent: { paddingHorizontal: Spacing.base, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
   greeting: { fontSize: Typography.sm, color: Colors.textSecondary, letterSpacing: 0.3 },

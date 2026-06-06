@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   testBtnText: { fontSize: Typography.xs, color: Colors.textSecondary },
 
   // Locked screen
-  lockedContainer: { flex: 1, backgroundColor: colors?.bg || Colors.bg },
+  lockedContainer: { flex: 1, backgroundColor: Colors.bg },
   lockedContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },
   lockedIcon: { marginBottom: Spacing.xl },
   lockedIconGrad: { width: 100, height: 100, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
