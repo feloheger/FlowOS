@@ -1,4 +1,6 @@
 const { withAndroidManifest, withMainApplication } = require('@expo/config-plugins');
+const path = require('path');
+const fs = require('fs');
 
 const withAppBlockerManifest = (config) => {
   return withAndroidManifest(config, async (config) => {
@@ -6,10 +8,7 @@ const withAppBlockerManifest = (config) => {
     const app = manifest.manifest.application[0];
 
     if (!app.service) app.service = [];
-    const serviceExists = app.service.some(
-      s => s.$?.['android:name'] === 'com.flowos.appblocker.AppBlockerService'
-    );
-    if (!serviceExists) {
+    if (!app.service.some(s => s.$?.['android:name'] === 'com.flowos.appblocker.AppBlockerService')) {
       app.service.push({
         $: {
           'android:name': 'com.flowos.appblocker.AppBlockerService',
@@ -17,12 +16,7 @@ const withAppBlockerManifest = (config) => {
           'android:exported': 'false',
           'android:foregroundServiceType': 'specialUse',
         },
-        'property': [{
-          $: {
-            'android:name': 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE',
-            'android:value': 'App usage monitoring for screen time limits',
-          }
-        }]
+        'property': [{ $: { 'android:name': 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE', 'android:value': 'App usage monitoring' } }]
       });
     }
 
@@ -31,38 +25,51 @@ const withAppBlockerManifest = (config) => {
       permissions.push({ $: { 'android:name': 'android.permission.PACKAGE_USAGE_STATS', 'tools:ignore': 'ProtectedPermissions' } });
     }
     manifest.manifest['uses-permission'] = permissions;
-    if (!manifest.manifest.$['xmlns:tools']) {
-      manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
-    }
+    if (!manifest.manifest.$['xmlns:tools']) manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
     return config;
   });
 };
 
-const withAppBlockerPackage = (config) => {
+const withCopyJavaFiles = (config) => {
   return withMainApplication(config, (config) => {
+    // Copy Java files into the app's source directory
+    const projectRoot = config.modRequest.projectRoot;
+    const destDir = path.join(projectRoot, 'android', 'app', 'src', 'main', 'java', 'com', 'flowos', 'appblocker');
+    const srcDir = path.join(projectRoot, 'modules', 'app-blocker', 'android', 'src', 'main', 'java', 'com', 'flowos', 'appblocker');
+
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+
+    ['AppBlockerService.java', 'AppBlockerModule.java', 'AppBlockerPackage.java'].forEach(file => {
+      const src = path.join(srcDir, file);
+      const dest = path.join(destDir, file);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dest);
+        console.log(`Copied ${file} to android app directory`);
+      } else {
+        console.warn(`WARNING: ${src} not found!`);
+      }
+    });
+
+    // Register package in MainApplication.kt
     let contents = config.modResults.contents;
 
-    // Add import with FULL package path
     if (!contents.includes('import com.flowos.appblocker.AppBlockerPackage')) {
       contents = contents.replace(
-        /^(package com\.flowos\.app)/m,
-        '$1\nimport com.flowos.appblocker.AppBlockerPackage'
+        /^(package com\.flowos\.app\n)/m,
+        '$1import com.flowos.appblocker.AppBlockerPackage\n'
       );
     }
 
-    // Add to getPackages() — Expo 51 Kotlin uses PackageList pattern
     if (!contents.includes('AppBlockerPackage()')) {
-      if (contents.includes('PackageList(this).packages')) {
-        contents = contents.replace(
-          /PackageList\(this\)\.packages(\s*$)/m,
-          'PackageList(this).packages.also { it.add(AppBlockerPackage()) }$1'
-        );
-      } else if (contents.includes('return PackageList(this).packages')) {
-        contents = contents.replace(
-          'return PackageList(this).packages',
-          'return PackageList(this).packages.also { it.add(AppBlockerPackage()) }'
-        );
-      }
+      contents = contents.replace(
+        /return PackageList\(this\)\.packages(\.apply\s*\{[^}]*\})?/,
+        (match) => {
+          if (match.includes('.apply')) {
+            return match.replace('return PackageList(this).packages.apply {', 'return PackageList(this).packages.apply {\n        add(AppBlockerPackage())');
+          }
+          return match + '.also { it.add(AppBlockerPackage()) }';
+        }
+      );
     }
 
     config.modResults.contents = contents;
@@ -72,6 +79,6 @@ const withAppBlockerPackage = (config) => {
 
 module.exports = (config) => {
   config = withAppBlockerManifest(config);
-  config = withAppBlockerPackage(config);
+  config = withCopyJavaFiles(config);
   return config;
 };
