@@ -23,7 +23,6 @@ const LANGUAGES = [
 
 const THEMES = [
   { id: 'dark', label: 'Dark', icon: '🌙' },
-  { id: 'light', label: 'Light', icon: '☀️' },
   { id: 'amoled', label: 'AMOLED', icon: '⚫' },
   { id: 'purple', label: 'Purple', icon: '💜' },
 ];
@@ -53,7 +52,8 @@ export default function SettingsScreen() {
       const s = await loadData('flowos_settings', null);
       if (s) {
         setLanguage(s.language || globalLang || 'en');
-        setTheme(s.theme || themeId || 'dark');
+        const savedTheme = s.theme || themeId || 'dark';
+        setTheme(savedTheme === 'light' ? 'dark' : savedTheme);
         setUnits(s.units || 'metric');
         setNotifications(s.notifications ?? true);
         setHabitReminder(s.habitReminder ?? true);
@@ -257,7 +257,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   key={t.id}
                   style={[styles.themeCard, theme === t.id && styles.themeCardActive]}
-                  onPress={() => { setTheme(t.id); setGlobalTheme(t.id); setShowThemeModal(false); }}
+                  onPress={() => { setTheme(t.id); const newTheme = t.id === 'light' ? 'dark' : t.id; setGlobalTheme(newTheme); setTheme(newTheme); setShowThemeModal(false); }}
                 >
                   <Text style={styles.themeEmoji}>{t.icon}</Text>
                   <Text style={[styles.themeLabel, theme === t.id && { color: Colors.accent }]}>{t.label}</Text>
