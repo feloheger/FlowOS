@@ -35,7 +35,6 @@ const UNITS = [
 export default function SettingsScreen() {
   const { themeId, setTheme: setGlobalTheme, language: globalLang, setLang: setGlobalLang , colors } = useAppContext();
   const [language, setLanguage] = useState('en');
-  const [theme, setTheme] = useState('dark');
   const [units, setUnits] = useState('metric');
   const [notifications, setNotifications] = useState(true);
   const [habitReminder, setHabitReminder] = useState(true);
@@ -44,7 +43,6 @@ export default function SettingsScreen() {
   const [soundEffects, setSoundEffects] = useState(false);
   const [haptics, setHaptics] = useState(true);
   const [showLangModal, setShowLangModal] = useState(false);
-  const [showThemeModal, setShowThemeModal] = useState(false);
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -52,8 +50,6 @@ export default function SettingsScreen() {
       const s = await loadData('flowos_settings', null);
       if (s) {
         setLanguage(s.language || globalLang || 'en');
-        const savedTheme = s.theme || themeId || 'dark';
-        setTheme(savedTheme === 'light' ? 'dark' : savedTheme);
         setUnits(s.units || 'metric');
         setNotifications(s.notifications ?? true);
         setHabitReminder(s.habitReminder ?? true);
@@ -72,7 +68,6 @@ export default function SettingsScreen() {
   };
 
   const currentLang = LANGUAGES.find(l => l.code === language);
-  const currentTheme = THEMES.find(t => t.id === theme);
 
   const confirmReset = () => {
     Alert.alert(
@@ -104,14 +99,6 @@ export default function SettingsScreen() {
         <FadeIn delay={60}>
           <Text style={styles.sectionLabel}>Appearance</Text>
           <Card style={styles.section}>
-            <SettingRow
-              icon="moon" iconColor="#A29BFE"
-              label="Theme"
-              value={`${currentTheme?.icon} ${currentTheme?.label}`}
-              onPress={() => setShowThemeModal(true)}
-              arrow
-            />
-            <Divider />
             <SettingRow
               icon="language" iconColor={Colors.info}
               label="Language"
@@ -245,32 +232,7 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      {/* Theme Modal */}
-      <Modal visible={showThemeModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <LinearGradient colors={['#1C1C26', '#13131A']} style={StyleSheet.absoluteFill} />
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Select Theme</Text>
-            <View style={styles.themeGrid}>
-              {THEMES.map(t => (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[styles.themeCard, theme === t.id && styles.themeCardActive]}
-                  onPress={() => { setTheme(t.id); const newTheme = t.id === 'light' ? 'dark' : t.id; setGlobalTheme(newTheme); setTheme(newTheme); setShowThemeModal(false); }}
-                >
-                  <Text style={styles.themeEmoji}>{t.icon}</Text>
-                  <Text style={[styles.themeLabel, theme === t.id && { color: Colors.accent }]}>{t.label}</Text>
-                  {theme === t.id && <Ionicons name="checkmark-circle" size={16} color={Colors.accent} style={{ marginTop: 4 }} />}
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowThemeModal(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      
     </View>
   );
 }
