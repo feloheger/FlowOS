@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "FlowOS",
-    "slug": "flowosfinal",
+    "name": "felixos",
+    "slug": "flowos",
     "version": "1.0.0",
-    "owner": "FelixOS",
+    "owner": "felixos",
     "extra": {
       "eas": {
         "projectId": "300fb5eb-6804-4ecb-b110-b920e5524e46"
