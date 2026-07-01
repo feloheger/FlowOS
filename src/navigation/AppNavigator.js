@@ -140,9 +140,12 @@ export default function AppNavigator() {
 
   const checkPermissions = async () => {
     try {
-      const [usage, overlay] = await Promise.all([
-        hasUsagePermission(),
-        hasOverlayPermission(),
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 3000)
+      );
+      const [usage, overlay] = await Promise.race([
+        Promise.all([hasUsagePermission(), hasOverlayPermission()]),
+        timeout,
       ]);
       if (usage && overlay) {
         // Alles OK — Blocker-Service starten
